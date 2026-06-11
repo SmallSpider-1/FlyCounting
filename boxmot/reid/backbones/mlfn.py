@@ -1,6 +1,5 @@
 # Mikel Broström 🔥 BoxMOT 🧾 AGPL-3.0 license
 
-from __future__ import absolute_import, division
 
 import torch
 import torch.utils.model_zoo as model_zoo
@@ -17,7 +16,7 @@ model_urls = {
 
 class MLFNBlock(nn.Module):
     def __init__(self, in_channels, out_channels, stride, fsm_channels, groups=32):
-        super(MLFNBlock, self).__init__()
+        super().__init__()
         self.groups = groups
         mid_channels = out_channels // 2
 
@@ -95,7 +94,7 @@ class MLFNBlock(nn.Module):
 class MLFN(nn.Module):
     """Multi-Level Factorisation Net.
 
-    Reference:
+    References:
         Chang et al. Multi-Level Factorisation Net for
         Person Re-Identification. CVPR 2018.
 
@@ -112,7 +111,7 @@ class MLFN(nn.Module):
         embed_dim=1024,
         **kwargs,
     ):
-        super(MLFN, self).__init__()
+        super().__init__()
         self.loss = loss
         self.groups = groups
 
@@ -207,7 +206,7 @@ class MLFN(nn.Module):
         elif self.loss == "triplet":
             return y, v
         else:
-            raise KeyError("Unsupported loss: {}".format(self.loss))
+            raise KeyError(f"Unsupported loss: {self.loss}")
 
 
 def init_pretrained_weights(model, model_url):
@@ -217,11 +216,7 @@ def init_pretrained_weights(model, model_url):
     """
     pretrain_dict = model_zoo.load_url(model_url)
     model_dict = model.state_dict()
-    pretrain_dict = {
-        k: v
-        for k, v in pretrain_dict.items()
-        if k in model_dict and model_dict[k].size() == v.size()
-    }
+    pretrain_dict = {k: v for k, v in pretrain_dict.items() if k in model_dict and model_dict[k].size() == v.size()}
     model_dict.update(pretrain_dict)
     model.load_state_dict(model_dict)
 
@@ -233,8 +228,6 @@ def mlfn(num_classes, loss="softmax", pretrained=True, **kwargs):
         import warnings
 
         warnings.warn(
-            "The imagenet pretrained weights need to be manually downloaded from {}".format(
-                model_urls["imagenet"]
-            )
+            "The imagenet pretrained weights need to be manually downloaded from {}".format(model_urls["imagenet"])
         )
     return model

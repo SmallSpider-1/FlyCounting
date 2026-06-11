@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 import cv2
 import numpy as np
 
@@ -12,11 +10,8 @@ from boxmot.utils import logger as LOGGER
 
 
 class ECC(BaseCMC):
-    """
-    OpenCV ECC-based motion estimation using cv2.findTransformECC.
-    Produces:
-      - 2x3 affine-like matrix for TRANSLATION/EUCLIDEAN/AFFINE
-      - 3x3 homography matrix for HOMOGRAPHY
+    """OpenCV ECC-based motion estimation using cv2.findTransformECC. Produces: - 2x3 affine-like matrix for
+    TRANSLATION/EUCLIDEAN/AFFINE - 3x3 homography matrix for HOMOGRAPHY.
     """
 
     def __init__(
@@ -39,10 +34,10 @@ class ECC(BaseCMC):
             float(eps),
         )
 
-        self.prev_img: Optional[np.ndarray] = None
-        self.prev_img_aligned: Optional[np.ndarray] = None
+        self.prev_img: np.ndarray | None = None
+        self.prev_img_aligned: np.ndarray | None = None
 
-    def apply(self, img: np.ndarray, dets: Optional[np.ndarray] = None) -> np.ndarray:
+    def apply(self, img: np.ndarray, dets: np.ndarray | None = None) -> np.ndarray:
         if self.warp_mode == cv2.MOTION_HOMOGRAPHY:
             warp_matrix = np.eye(3, 3, dtype=np.float32)
         else:

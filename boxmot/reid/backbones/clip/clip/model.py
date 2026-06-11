@@ -1,7 +1,8 @@
 # Mikel Broström 🔥 BoxMOT 🧾 AGPL-3.0 license
 
+from __future__ import annotations
+
 from collections import OrderedDict
-from typing import Tuple, Union
 
 import numpy as np
 import torch
@@ -33,11 +34,15 @@ class Bottleneck(nn.Module):
 
         if stride > 1 or inplanes != planes * Bottleneck.expansion:
             # downsampling layer is prepended with an avgpool, and the subsequent convolution has stride 1
-            self.downsample = nn.Sequential(OrderedDict([
-                ("-1", nn.AvgPool2d(stride)),
-                ("0", nn.Conv2d(inplanes, planes * self.expansion, 1, stride=1, bias=False)),
-                ("1", nn.BatchNorm2d(planes * self.expansion))
-            ]))
+            self.downsample = nn.Sequential(
+                OrderedDict(
+                    [
+                        ("-1", nn.AvgPool2d(stride)),
+                        ("0", nn.Conv2d(inplanes, planes * self.expansion, 1, stride=1, bias=False)),
+                        ("1", nn.BatchNorm2d(planes * self.expansion)),
+                    ]
+                )
+            )
 
     def forward(self, x: torch.Tensor):
         identity = x
@@ -56,11 +61,9 @@ class Bottleneck(nn.Module):
 
 
 class AttentionPool2d(nn.Module):
-    def __init__(self, spacial_dim: int, embed_dim: int, num_heads: int, output_dim: int = None):
+    def __init__(self, spacial_dim: int, embed_dim: int, num_heads: int, output_dim: int | None = None):
         super().__init__()
-        self.positional_embedding = nn.Parameter(
-            torch.randn(spacial_dim + 1, embed_dim) / embed_dim**0.5
-        )
+        self.positional_embedding = nn.Parameter(torch.randn(spacial_dim + 1, embed_dim) / embed_dim**0.5)
         self.k_proj = nn.Linear(embed_dim, embed_dim)
         self.q_proj = nn.Linear(embed_dim, embed_dim)
         self.v_proj = nn.Linear(embed_dim, embed_dim)
@@ -98,11 +101,10 @@ class AttentionPool2d(nn.Module):
 
 
 class ModifiedResNet(nn.Module):
-    """
-    A ResNet class that is similar to torchvision's but contains the following changes:
-    - There are now 3 "stem" convolutions as opposed to 1, with an average pool instead of a max pool.
-    - Performs anti-aliasing strided convolutions, where an avgpool is prepended to convolutions with stride > 1
-    - The final pooling layer is a QKV attention instead of an average pool
+    """A ResNet class that is similar to torchvision's but contains the following changes: - There are now 3 "stem"
+    convolutions as opposed to 1, with an average pool instead of a max pool. - Performs anti-aliasing strided
+    convolutions, where an avgpool is prepended to convolutions with stride > 1 - The final pooling layer is a QKV
+    attention instead of an average pool.
     """
 
     def __init__(self, layers, output_dim, heads, input_resolution=224, width=64):
@@ -111,13 +113,9 @@ class ModifiedResNet(nn.Module):
         self.input_resolution = input_resolution
 
         # the 3-layer stem
-        self.conv1 = nn.Conv2d(
-            3, width // 2, kernel_size=3, stride=2, padding=1, bias=False
-        )
+        self.conv1 = nn.Conv2d(3, width // 2, kernel_size=3, stride=2, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(width // 2)
-        self.conv2 = nn.Conv2d(
-            width // 2, width // 2, kernel_size=3, padding=1, bias=False
-        )
+        self.conv2 = nn.Conv2d(width // 2, width // 2, kernel_size=3, padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(width // 2)
         self.conv3 = nn.Conv2d(width // 2, width, kernel_size=3, padding=1, bias=False)
         self.bn3 = nn.BatchNorm2d(width)
@@ -187,20 +185,20 @@ class ResidualAttentionBlock(nn.Module):
 
         self.attn = nn.MultiheadAttention(d_model, n_head)
         self.ln_1 = LayerNorm(d_model)
-        self.mlp = nn.Sequential(OrderedDict([
-            ("c_fc", nn.Linear(d_model, d_model * 4)),
-            ("gelu", QuickGELU()),
-            ("c_proj", nn.Linear(d_model * 4, d_model))
-        ]))
+        self.mlp = nn.Sequential(
+            OrderedDict(
+                [
+                    ("c_fc", nn.Linear(d_model, d_model * 4)),
+                    ("gelu", QuickGELU()),
+                    ("c_proj", nn.Linear(d_model * 4, d_model)),
+                ]
+            )
+        )
         self.ln_2 = LayerNorm(d_model)
         self.attn_mask = attn_mask
 
     def attention(self, x: torch.Tensor):
-        self.attn_mask = (
-            self.attn_mask.to(dtype=x.dtype, device=x.device)
-            if self.attn_mask is not None
-            else None
-        )
+        self.attn_mask = self.attn_mask.to(dtype=x.dtype, device=x.device) if self.attn_mask is not None else None
         return self.attn(x, x, x, need_weights=False, attn_mask=self.attn_mask)[0]
 
     def forward(self, x: torch.Tensor):
@@ -210,15 +208,11 @@ class ResidualAttentionBlock(nn.Module):
 
 
 class Transformer(nn.Module):
-    def __init__(
-        self, width: int, layers: int, heads: int, attn_mask: torch.Tensor = None
-    ):
+    def __init__(self, width: int, layers: int, heads: int, attn_mask: torch.Tensor = None):
         super().__init__()
         self.width = width
         self.layers = layers
-        self.resblocks = nn.Sequential(
-            *[ResidualAttentionBlock(width, heads, attn_mask) for _ in range(layers)]
-        )
+        self.resblocks = nn.Sequential(*[ResidualAttentionBlock(width, heads, attn_mask) for _ in range(layers)])
 
     def forward(self, x: torch.Tensor):
         return self.resblocks(x)
@@ -250,9 +244,7 @@ class VisionTransformer(nn.Module):
 
         scale = width**-0.5
         self.class_embedding = nn.Parameter(scale * torch.randn(width))
-        self.positional_embedding = nn.Parameter(
-            scale * torch.randn(h_resolution * w_resolution + 1, width)
-        )
+        self.positional_embedding = nn.Parameter(scale * torch.randn(h_resolution * w_resolution + 1, width))
         self.ln_pre = LayerNorm(width)
 
         self.transformer = Transformer(width, layers, heads)
@@ -266,7 +258,8 @@ class VisionTransformer(nn.Module):
         x = x.permute(0, 2, 1)  # shape = [*, grid ** 2, width]
         x = torch.cat(
             [
-                self.class_embedding.to(x.dtype) +
+                self.class_embedding.to(x.dtype)
+                +
                 # shape = [*, grid ** 2 + 1, width]
                 torch.zeros(x.shape[0], 1, x.shape[-1], dtype=x.dtype, device=x.device),
                 x,
@@ -294,11 +287,12 @@ class VisionTransformer(nn.Module):
 
 
 class CLIP(nn.Module):
-    def __init__(self,
+    def __init__(
+        self,
         embed_dim: int,
         # vision
         image_resolution: int,
-        vision_layers: Union[Tuple[int, int, int, int], int],
+        vision_layers: tuple[int, int, int, int] | int,
         vision_width: int,
         vision_patch_size: int,
         vision_stride_size: int,
@@ -346,9 +340,7 @@ class CLIP(nn.Module):
 
         self.vocab_size = vocab_size
         self.token_embedding = nn.Embedding(vocab_size, transformer_width)
-        self.positional_embedding = nn.Parameter(
-            torch.empty(self.context_length, transformer_width)
-        )
+        self.positional_embedding = nn.Parameter(torch.empty(self.context_length, transformer_width))
         self.ln_final = LayerNorm(transformer_width)
 
         self.text_projection = nn.Parameter(torch.empty(transformer_width, embed_dim))
@@ -378,9 +370,7 @@ class CLIP(nn.Module):
                     if name.endswith("bn3.weight"):
                         nn.init.zeros_(param)
 
-        proj_std = (self.transformer.width**-0.5) * (
-            (2 * self.transformer.layers) ** -0.5
-        )
+        proj_std = (self.transformer.width**-0.5) * ((2 * self.transformer.layers) ** -0.5)
         attn_std = self.transformer.width**-0.5
         fc_std = (2 * self.transformer.width) ** -0.5
         for block in self.transformer.resblocks:
@@ -438,7 +428,7 @@ class CLIP(nn.Module):
 
 
 def convert_weights(model: nn.Module):
-    """Convert applicable model parameters to fp16"""
+    """Convert applicable model parameters to fp16."""
 
     def _convert_weights_to_fp16(l):
         if isinstance(l, (nn.Conv1d, nn.Conv2d, nn.Linear)):
@@ -466,46 +456,26 @@ def convert_weights(model: nn.Module):
     model.apply(_convert_weights_to_fp16)
 
 
-def build_model(
-    state_dict: dict, h_resolution: int, w_resolution: int, vision_stride_size: int
-):
+def build_model(state_dict: dict, h_resolution: int, w_resolution: int, vision_stride_size: int):
     vit = "visual.proj" in state_dict
 
     if vit:
         vision_width = state_dict["visual.conv1.weight"].shape[0]
         vision_layers = len(
-            [
-                k
-                for k in state_dict.keys()
-                if k.startswith("visual.") and k.endswith(".attn.in_proj_weight")
-            ]
+            [k for k in state_dict.keys() if k.startswith("visual.") and k.endswith(".attn.in_proj_weight")]
         )
         vision_patch_size = state_dict["visual.conv1.weight"].shape[-1]
-        grid_size = round(
-            (state_dict["visual.positional_embedding"].shape[0] - 1) ** 0.5
-        )
+        grid_size = round((state_dict["visual.positional_embedding"].shape[0] - 1) ** 0.5)
         image_resolution = vision_patch_size * grid_size
     else:  # RN50
         counts: list = [
-            len(
-                set(
-                    k.split(".")[2]
-                    for k in state_dict
-                    if k.startswith(f"visual.layer{b}")
-                )
-            )
-            for b in [1, 2, 3, 4]
+            len(set(k.split(".")[2] for k in state_dict if k.startswith(f"visual.layer{b}"))) for b in [1, 2, 3, 4]
         ]
         vision_layers = tuple(counts)
         vision_width = state_dict["visual.layer1.0.conv1.weight"].shape[0]
-        output_width = round(
-            (state_dict["visual.attnpool.positional_embedding"].shape[0] - 1) ** 0.5
-        )
+        output_width = round((state_dict["visual.attnpool.positional_embedding"].shape[0] - 1) ** 0.5)
         vision_patch_size = None
-        assert (
-            output_width**2 + 1
-            == state_dict["visual.attnpool.positional_embedding"].shape[0]
-        )
+        assert output_width**2 + 1 == state_dict["visual.attnpool.positional_embedding"].shape[0]
         image_resolution = output_width * 32
 
     embed_dim = state_dict["text_projection"].shape[1]
@@ -513,11 +483,7 @@ def build_model(
     vocab_size = state_dict["token_embedding.weight"].shape[0]
     transformer_width = state_dict["ln_final.weight"].shape[0]
     transformer_heads = transformer_width // 64
-    transformer_layers = len(
-        set(
-            k.split(".")[2] for k in state_dict if k.startswith("transformer.resblocks")
-        )
-    )
+    transformer_layers = len(set(k.split(".")[2] for k in state_dict if k.startswith("transformer.resblocks")))
 
     model = CLIP(
         embed_dim,
@@ -550,8 +516,7 @@ def build_model(
         )
 
     for key in ["input_resolution", "context_length", "vocab_size"]:
-        if key in state_dict:
-            del state_dict[key]
+        state_dict.pop(key, None)
 
     convert_weights(model)
 
@@ -573,7 +538,7 @@ def resize_pos_embed(posemb, posemb_new, hight, width):
     ntok_new -= 1
 
     gs_old = int(math.sqrt(len(posemb_grid)))  # 14
-    print("Position embedding resize to height:{} width: {}".format(hight, width))
+    print(f"Position embedding resize to height:{hight} width: {width}")
     posemb_grid = posemb_grid.reshape(1, gs_old, gs_old, -1).permute(0, 3, 1, 2)
     posemb_grid = F.interpolate(posemb_grid, size=(hight, width), mode="bilinear")
     posemb_grid = posemb_grid.permute(0, 2, 3, 1).reshape(1, hight * width, -1)

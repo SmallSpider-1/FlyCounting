@@ -7,11 +7,11 @@
   "workers": 8,
   "resolution_sweep": [640, 512, 416, 320],
   "export_formats": [
-    {"format": "ncnn", "args": {"imgsz": 640}},
-    {"format": "onnx", "args": {"imgsz": 640, "simplify": true}},
-    {"format": "onnx", "args": {"imgsz": 640, "simplify": true, "dynamic": true}},
-    {"format": "tflite", "args": {"imgsz": 640}},
-    {"format": "tflite", "args": {"imgsz": 640, "int8": true}}
+    { "format": "ncnn", "args": { "imgsz": 640 } },
+    { "format": "onnx", "args": { "imgsz": 640, "simplify": true } },
+    { "format": "onnx", "args": { "imgsz": 640, "simplify": true, "dynamic": true } },
+    { "format": "tflite", "args": { "imgsz": 640 } },
+    { "format": "tflite", "args": { "imgsz": 640, "int8": true } }
   ],
   "notes": [
     "Run all scripts from /home/admin1/Projects/ultralytics-main.",

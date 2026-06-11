@@ -8,13 +8,9 @@ from boxmot.motion.kalman_filters.xyah import KalmanFilterXYAH
 
 
 class TrackState:
-    """
-    Enumeration type for the single target track state. Newly created tracks are
-    classified as `tentative` until enough evidence has been collected. Then,
-    the track state is changed to `confirmed`. Tracks that are no longer alive
-    are classified as `deleted` to mark them for removal from the set of active
-    tracks.
-
+    """Enumeration type for the single target track state. Newly created tracks are classified as `tentative` until
+    enough evidence has been collected. Then, the track state is changed to `confirmed`. Tracks that are no longer
+    alive are classified as `deleted` to mark them for removal from the set of active tracks.
     """
 
     Tentative = 1
@@ -23,10 +19,8 @@ class TrackState:
 
 
 class Track:
-    """
-    A single target track with state space `(x, y, a, h)` and associated
-    velocities, where `(x, y)` is the center of the bounding box, `a` is the
-    aspect ratio and `h` is the height.
+    """A single target track with state space `(x, y, a, h)` and associated velocities, where `(x, y)` is the center of
+    the bounding box, `a` is the aspect ratio and `h` is the height.
 
     Parameters
     ----------
@@ -47,26 +41,17 @@ class Track:
         Feature vector of the detection this track originates from. If not None,
         this feature is added to the `features` cache.
 
-    Attributes
-    ----------
-    mean : ndarray
-        Mean vector of the initial state distribution.
-    covariance : ndarray
-        Covariance matrix of the initial state distribution.
-    track_id : int
-        A unique track identifier.
-    hits : int
-        Total number of measurement updates.
-    age : int
-        Total number of frames since first occurance.
-    time_since_update : int
-        Total number of frames since last measurement update.
-    state : TrackState
-        The current track state.
-    features : List[ndarray]
-        A cache of features. On each measurement update, the associated feature
-        vector is added to this list.
-
+    Attributes:
+        ----------
+        mean: ndarray Mean vector of the initial state distribution.
+        covariance: ndarray Covariance matrix of the initial state distribution.
+        track_id: int A unique track identifier.
+        hits: int Total number of measurement updates.
+        age: int Total number of frames since first occurrence.
+        time_since_update: int Total number of frames since last measurement update.
+        state: TrackState The current track state.
+        features: List[ndarray] A cache of features. On each measurement update, the associated feature vector is added
+            to this list.
     """
 
     def __init__(
@@ -90,10 +75,7 @@ class Track:
         # start with confirmed in Ci as test expect equal amount of outputs as inputs
         self.state = (
             TrackState.Confirmed
-            if (
-                os.getenv("GITHUB_ACTIONS") == "true"
-                and os.getenv("GITHUB_JOB") != "mot-metrics-benchmark"
-            )
+            if (os.getenv("GITHUB_ACTIONS") == "true" and os.getenv("GITHUB_JOB") != "mot-metrics-benchmark")
             else TrackState.Tentative
         )
         self.features = []
@@ -108,14 +90,10 @@ class Track:
         self.mean, self.covariance = self.kf.initiate(self.bbox)
 
     def to_tlwh(self):
-        """Get current position in bounding box format `(top left x, top left y,
-        width, height)`.
+        """Get current position in bounding box format `(top left x, top left y, width, height)`.
 
-        Returns
-        -------
-        ndarray
-            The bounding box.
-
+        Returns:
+            -------: ndarray The bounding box.
         """
         ret = self.mean[:4].copy()
         ret[2] *= ret[3]
@@ -123,14 +101,10 @@ class Track:
         return ret
 
     def to_tlbr(self):
-        """Get kf estimated current position in bounding box format `(min x, miny, max x,
-        max y)`.
+        """Get kf estimated current position in bounding box format `(min x, miny, max x, max y)`.
 
-        Returns
-        -------
-        ndarray
-            The predicted kf bounding box.
-
+        Returns:
+            -------: ndarray The predicted kf bounding box.
         """
         ret = self.to_tlwh()
         ret[2:] = ret[:2] + ret[2:]
@@ -152,34 +126,25 @@ class Track:
         self.time_since_update += 1
 
     def predict(self):
-        """Propagate the state distribution to the current time step using a
-        Kalman filter prediction step.
+        """Propagate the state distribution to the current time step using a Kalman filter prediction step.
         """
         self.mean, self.covariance = self.kf.predict(self.mean, self.covariance)
         self.age += 1
         self.time_since_update += 1
 
     def update(self, detection):
-        """Perform Kalman filter measurement update step and update the feature
-        cache.
-        Parameters
-        ----------
-        detection : Detection
-            The associated detection.
+        """Perform Kalman filter measurement update step and update the feature cache. Parameters. ---------- detection
+        : Detection The associated detection.
         """
         self.bbox = detection.to_xyah()
         self.conf = detection.conf
         self.cls = detection.cls
         self.det_ind = detection.det_ind
-        self.mean, self.covariance = self.kf.update(
-            self.mean, self.covariance, self.bbox, self.conf
-        )
+        self.mean, self.covariance = self.kf.update(self.mean, self.covariance, self.bbox, self.conf)
 
         feature = detection.feat / np.linalg.norm(detection.feat)
 
-        smooth_feat = (
-            self.ema_alpha * self.features[-1] + (1 - self.ema_alpha) * feature
-        )
+        smooth_feat = self.ema_alpha * self.features[-1] + (1 - self.ema_alpha) * feature
         smooth_feat /= np.linalg.norm(smooth_feat)
         self.features = [smooth_feat]
 

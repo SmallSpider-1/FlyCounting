@@ -1,6 +1,6 @@
 # Mikel Broström 🔥 BoxMOT 🧾 AGPL-3.0 license
 
-__version__ = '16.0.11'
+__version__ = "16.0.11"
 
 from boxmot.engine.results import track
 from boxmot.reid.core import ReID
@@ -26,15 +26,15 @@ TRACKERS = [
 ]
 
 __all__ = (
-    "__version__",
-    "StrongSort",
-    "OcSort",
-    "ByteTrack",
+    "SFSORT",
+    "BoostTrack",
     "BotSort",
+    "ByteTrack",
     "DeepOcSort",
     "HybridSort",
-    "BoostTrack",
-    "SFSORT",
+    "OcSort",
+    "StrongSort",
+    "__version__",
     "create_tracker",
     "get_tracker_config",
     "gsi",
