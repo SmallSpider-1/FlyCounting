@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from importlib import import_module
-from typing import Callable, Dict, Iterable, Mapping, Optional, Type
+from typing import Callable, Dict, Optional, Type
 
 from boxmot.motion.cmc.base_cmc import BaseCMC
 
@@ -17,10 +18,11 @@ def _normalize(name: str) -> str:
 @dataclass(frozen=True)
 class _LazyLoader:
     """Lazily import and return a CMC class by module and attribute name."""
+
     module: str
     attr: str
 
-    def __call__(self) -> Type[BaseCMC]:
+    def __call__(self) -> type[BaseCMC]:
         mod = import_module(self.module)
         cls = getattr(mod, self.attr)
         # Optional: basic sanity check to fail fast if registry is misconfigured.
@@ -30,7 +32,7 @@ class _LazyLoader:
 
 
 # Registry of known methods (lazy-loaded).
-_CMC_REGISTRY: Mapping[str, Callable[[], Type[BaseCMC]]] = {
+_CMC_REGISTRY: Mapping[str, Callable[[], type[BaseCMC]]] = {
     "ecc": _LazyLoader("boxmot.motion.cmc.ecc", "ECC"),
     "orb": _LazyLoader("boxmot.motion.cmc.orb", "ORB"),
     "sof": _LazyLoader("boxmot.motion.cmc.sof", "SOF"),
@@ -43,12 +45,11 @@ def available_cmc_methods() -> tuple[str, ...]:
     return tuple(sorted(_CMC_REGISTRY.keys()))
 
 
-def get_cmc_method(name: Optional[str]) -> Optional[Type[BaseCMC]]:
-    """
-    Resolve a CMC method name to its class.
+def get_cmc_method(name: str | None) -> type[BaseCMC] | None:
+    """Resolve a CMC method name to its class.
 
-    Returns None only when name is None (useful for "disabled" configs).
-    Raises ValueError for unknown non-None names to fail fast and clearly.
+    Returns None only when name is None (useful for "disabled" configs). Raises ValueError for unknown non-None names to
+    fail fast and clearly.
     """
     if name is None:
         return None
@@ -56,16 +57,11 @@ def get_cmc_method(name: Optional[str]) -> Optional[Type[BaseCMC]]:
     key = _normalize(name)
     loader = _CMC_REGISTRY.get(key)
     if loader is None:
-        raise ValueError(
-            f"Unknown cmc_method={name!r}. "
-            f"Supported values: {', '.join(available_cmc_methods())}"
-        )
+        raise ValueError(f"Unknown cmc_method={name!r}. Supported values: {', '.join(available_cmc_methods())}")
     return loader()
 
 
-def create_cmc(name: Optional[str], /, **kwargs) -> Optional[BaseCMC]:
-    """
-    Convenience factory: create and return an instance.
-    """
+def create_cmc(name: str | None, /, **kwargs) -> BaseCMC | None:
+    """Convenience factory: create and return an instance."""
     cls = get_cmc_method(name)
     return None if cls is None else cls(**kwargs)

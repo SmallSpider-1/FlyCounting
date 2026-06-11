@@ -1,15 +1,14 @@
 # Copyright (c) 2024, Tri Dao.
 # The TensorParallel linear modules are inspired by https://github.com/NVIDIA/apex/blob/master/apex/transformer/tensor_parallel/layers.py
-from typing import Optional
+from __future__ import annotations
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from einops import rearrange
 from torch import Tensor
 from torch.cuda.amp import custom_bwd, custom_fwd
 from torch.distributed import ProcessGroup
-
-from einops import rearrange
 
 from mamba_ssm.distributed.distributed_utils import (
     all_gather_raw,
@@ -24,9 +23,8 @@ class ParallelLinearFunc(torch.autograd.Function):
     @staticmethod
     @custom_fwd
     def forward(ctx, x, weight, bias, process_group=None, sequence_parallel=True):
-        """
-        If process_group is not None and sequence_parallel=True, we're doing Tensor Parallel
-        with sequence parallelism: we do an all_gather_raw of x before doing the matmul.
+        """If process_group is not None and sequence_parallel=True, we're doing Tensor Parallel with sequence
+        parallelism: we do an all_gather_raw of x before doing the matmul.
         """
         ctx.compute_weight_gradient = weight.requires_grad
         ctx.process_group = process_group
@@ -47,8 +45,8 @@ class ParallelLinearFunc(torch.autograd.Function):
         weight = weight.contiguous()
         if process_group is not None and sequence_parallel:
             handle_x.wait()
-        batch_shape, n = total_x.shape[:-1], total_x.shape[-1]
-        batch_dim = batch_shape.numel()
+        batch_shape, _n = total_x.shape[:-1], total_x.shape[-1]
+        batch_shape.numel()
         # https://github.com/pytorch/pytorch/blob/5b51849b48a7dbccd297286cc0110def4706f9e7/aten/src/ATen/native/cuda/Blas.cpp#L174
         output = F.linear(total_x, weight, bias)
         if ctx.compute_weight_gradient:
@@ -87,9 +85,7 @@ class ParallelLinearFunc(torch.autograd.Function):
             assert ctx.compute_weight_gradient
             if process_group is not None and sequence_parallel:
                 handle_x.wait()
-            grad_weight = torch.einsum(
-                "bo,bi->oi", grad_output, total_x.reshape(batch_dim, total_x.shape[-1])
-            )
+            grad_weight = torch.einsum("bo,bi->oi", grad_output, total_x.reshape(batch_dim, total_x.shape[-1]))
         else:
             grad_weight = None
         grad_bias = grad_output.sum(dim=0) if ctx.needs_input_grad[2] else None
@@ -101,8 +97,8 @@ class ParallelLinearFunc(torch.autograd.Function):
 def parallel_linear_func(
     x: Tensor,
     weight: Tensor,
-    bias: Optional[Tensor] = None,
-    process_group: Optional[ProcessGroup] = None,
+    bias: Tensor | None = None,
+    process_group: ProcessGroup | None = None,
     sequence_parallel: bool = True,
 ):
     return ParallelLinearFunc.apply(x, weight, bias, process_group, sequence_parallel)
@@ -129,9 +125,7 @@ class ColumnParallelLinear(nn.Linear):
         mod = multiple % world_size
         # The first @mod ranks get @div + 1 copies, the rest get @div copies
         local_multiple = div + int(torch.distributed.get_rank(process_group) < mod)
-        super().__init__(
-            in_features, local_multiple * multiple_of, bias=bias, device=device, dtype=dtype
-        )
+        super().__init__(in_features, local_multiple * multiple_of, bias=bias, device=device, dtype=dtype)
         self.process_group = process_group
         self.sequence_parallel = sequence_parallel
 
@@ -182,9 +176,8 @@ class RowParallelLinear(nn.Linear):
         self.sequence_parallel = sequence_parallel
 
     def forward(self, x):
-        """
-        We're doing Tensor Parallel with sequence parallelism: we do the matmul and then
-        a reduce_scatter of the result.
+        """We're doing Tensor Parallel with sequence parallelism: we do the matmul and then a reduce_scatter of the
+        result.
         """
         out = parallel_linear_func(x, self.weight, self.bias)
         reduce_fn = reduce_scatter if self.sequence_parallel else all_reduce
@@ -197,10 +190,7 @@ class VocabParallelEmbedding(nn.Embedding):
         if process_group is not None:
             world_size = torch.distributed.get_world_size(process_group)
             if num_embeddings % world_size != 0:
-                raise ValueError(
-                    f"num_embeddings ({num_embeddings}) must be divisible by "
-                    f"world_size ({world_size})"
-                )
+                raise ValueError(f"num_embeddings ({num_embeddings}) must be divisible by world_size ({world_size})")
             if world_size > 1 and padding_idx is not None:
                 raise RuntimeError("ParallelEmbedding does not support padding_idx")
         else:
@@ -229,10 +219,7 @@ class ColumnParallelEmbedding(nn.Embedding):
         if process_group is not None:
             world_size = torch.distributed.get_world_size(process_group)
             if embedding_dim % world_size != 0:
-                raise ValueError(
-                    f"embedding_dim ({embedding_dim}) must be divisible by "
-                    f"world_size ({world_size})"
-                )
+                raise ValueError(f"embedding_dim ({embedding_dim}) must be divisible by world_size ({world_size})")
         else:
             world_size = 1
         super().__init__(num_embeddings, embedding_dim // world_size, *args, **kwargs)
@@ -250,9 +237,7 @@ class ParallelEmbeddings(nn.Module):
         device=None,
         dtype=None,
     ):
-        """
-        If max_position_embeddings <= 0, there's no position embeddings
-        """
+        """If max_position_embeddings <= 0, there's no position embeddings."""
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
         self.process_group = process_group
@@ -271,11 +256,9 @@ class ParallelEmbeddings(nn.Module):
             )
 
     def forward(self, input_ids, position_ids=None, combine_batch_seqlen_dim=False):
+        """input_ids: (batch, seqlen) position_ids: (batch, seqlen).
         """
-        input_ids: (batch, seqlen)
-        position_ids: (batch, seqlen)
-        """
-        batch_size, seqlen = input_ids.shape
+        _batch_size, seqlen = input_ids.shape
         world_size = torch.distributed.get_world_size(self.process_group)
         embeddings = self.word_embeddings(input_ids)
         if self.max_position_embeddings > 0:
@@ -287,9 +270,7 @@ class ParallelEmbeddings(nn.Module):
             else:
                 partition_dim = self.position_embeddings.embedding_dim
                 rank = torch.distributed.get_rank(self.process_group)
-                embeddings[
-                    ..., rank * partition_dim : (rank + 1) * partition_dim
-                ] += position_embeddings
+                embeddings[..., rank * partition_dim : (rank + 1) * partition_dim] += position_embeddings
         if combine_batch_seqlen_dim:
             embeddings = rearrange(embeddings, "b s d -> (b s) d")
         reduce_fn = reduce_scatter if self.sequence_parallel else all_reduce

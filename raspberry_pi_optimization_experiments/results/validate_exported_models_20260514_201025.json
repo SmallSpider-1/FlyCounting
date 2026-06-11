@@ -22,18 +22,10 @@
           "postprocess": 0.1911215455693543
         },
         "save_dir": "/home/admin1/Projects/ultralytics-main/raspberry_pi_optimization_experiments/results/val_exported_models/yolo26n.onnx",
-        "class_precision": [
-          0.9806180508745607
-        ],
-        "class_recall": [
-          0.9662132248196826
-        ],
-        "class_map50": [
-          0.9918770861385057
-        ],
-        "class_map50_95": [
-          0.8526698347422675
-        ]
+        "class_precision": [0.9806180508745607],
+        "class_recall": [0.9662132248196826],
+        "class_map50": [0.9918770861385057],
+        "class_map50_95": [0.8526698347422675]
       }
     },
     {
@@ -52,18 +44,10 @@
           "postprocess": 0.06792866145754742
         },
         "save_dir": "/home/admin1/Projects/ultralytics-main/raspberry_pi_optimization_experiments/results/val_exported_models/yolo26n.onnx",
-        "class_precision": [
-          0.9723807810598434
-        ],
-        "class_recall": [
-          0.9779637473433794
-        ],
-        "class_map50": [
-          0.9918363165127474
-        ],
-        "class_map50_95": [
-          0.8513663393034838
-        ]
+        "class_precision": [0.9723807810598434],
+        "class_recall": [0.9779637473433794],
+        "class_map50": [0.9918363165127474],
+        "class_map50_95": [0.8513663393034838]
       }
     }
   ]
