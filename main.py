@@ -11,6 +11,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+
 from ultralytics import YOLO
 
 warnings.filterwarnings("ignore")
@@ -105,7 +106,9 @@ def resolve_weights(weights):
         if candidate.exists():
             return candidate
 
-    best_weights = sorted((ROOT / "runs/detect").glob("**/weights/best.pt"), key=lambda p: p.stat().st_mtime, reverse=True)
+    best_weights = sorted(
+        (ROOT / "runs/detect").glob("**/weights/best.pt"), key=lambda p: p.stat().st_mtime, reverse=True
+    )
     if best_weights:
         return best_weights[0]
 
@@ -225,7 +228,7 @@ def get_count_region(size):
 
 def draw_text(image, text, position, font_scale=0.8, text_color=(255, 255, 255), bg_color=(0, 0, 0)):
     font = cv2.FONT_HERSHEY_SIMPLEX
-    thickness = max(1, int(round(font_scale * 2)))
+    thickness = max(1, round(font_scale * 2))
     (text_w, text_h), baseline = cv2.getTextSize(text, font, font_scale, thickness)
     x, y = position
     cv2.rectangle(image, (x - 4, y - text_h - 8), (x + text_w + 4, y + baseline + 4), bg_color, -1)
@@ -299,7 +302,9 @@ def save_image(image_saver, path, image):
         image_saver.save(path, image.copy())
 
 
-def save_event_frames(event_dir, event, previous_annotated, current_annotated, previous_raw, current_raw, save_raw, image_saver):
+def save_event_frames(
+    event_dir, event, previous_annotated, current_annotated, previous_raw, current_raw, save_raw, image_saver
+):
     video_stem = Path(event["video"]).stem
     event_name = (
         f"global{event['global_frame']:08d}_{video_stem}_frame{event['video_frame']:06d}_"
@@ -315,13 +320,26 @@ def save_event_frames(event_dir, event, previous_annotated, current_annotated, p
         save_image(image_saver, event_dir / f"{event_name}_02_curr_raw.jpg", current_raw)
 
 
-def process_video(model, video_path, args, class_names, combined_writer, image_saver, output_size, region_counts, event_rows, segment_rows, global_state, track_classes):
+def process_video(
+    model,
+    video_path,
+    args,
+    class_names,
+    combined_writer,
+    image_saver,
+    output_size,
+    region_counts,
+    event_rows,
+    segment_rows,
+    global_state,
+    track_classes,
+):
     event_dir = args.output / "event_frames"
     event_dir.mkdir(parents=True, exist_ok=True)
 
     input_size, fps, _ = get_video_info(video_path)
     center, radius = get_count_region(output_size)
-    tracker = ByteTrack(frame_rate=max(1, int(round(fps))))
+    tracker = ByteTrack(frame_rate=max(1, round(fps)))
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         raise RuntimeError(f"无法打开视频: {video_path}")
@@ -472,7 +490,7 @@ def main():
     print(f"输出目录: {args.output}")
     print(f"合并视频: {combined_video}")
     print(f"视频数量: {len(videos)}")
-    max_global_frames = int(round(first_fps * args.max_seconds)) if args.max_seconds else 0
+    max_global_frames = round(first_fps * args.max_seconds) if args.max_seconds else 0
     if max_global_frames:
         print(f"测试截断: {args.max_seconds:g} 秒，约 {max_global_frames} 帧")
 
@@ -534,13 +552,29 @@ def main():
     )
     write_csv(
         events_csv,
-        ["video", "video_frame", "global_frame", "track_id", "cls_id", "class_name", "direction", "delta", "count_after", "center_x", "center_y", "conf"],
+        [
+            "video",
+            "video_frame",
+            "global_frame",
+            "track_id",
+            "cls_id",
+            "class_name",
+            "direction",
+            "delta",
+            "count_after",
+            "center_x",
+            "center_y",
+            "conf",
+        ],
         event_rows,
     )
     write_csv(
         final_csv,
         ["class_id", "class_name", "final_region_count"],
-        [{"class_id": cls_id, "class_name": class_names[cls_id], "final_region_count": region_counts[cls_id]} for cls_id in sorted(class_names)],
+        [
+            {"class_id": cls_id, "class_name": class_names[cls_id], "final_region_count": region_counts[cls_id]}
+            for cls_id in sorted(class_names)
+        ],
     )
 
     print(f"全部处理完成，合并视频: {combined_video}")

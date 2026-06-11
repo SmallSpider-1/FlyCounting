@@ -88,9 +88,7 @@ class STrack(BaseTrack):
                 mean_state[7:10] = 0  # Reset size/angle velocities
             else:
                 mean_state[6:8] = 0
-        self.mean, self.covariance = self.kalman_filter.predict(
-            mean_state, self.covariance
-        )
+        self.mean, self.covariance = self.kalman_filter.predict(mean_state, self.covariance)
 
     @staticmethod
     def multi_predict(stracks):
@@ -107,9 +105,7 @@ class STrack(BaseTrack):
                 else:
                     multi_mean[i][6:8] = 0  # Reset velocities
         kalman = STrack.shared_kalman_obb if is_obb else STrack.shared_kalman
-        multi_mean, multi_covariance = kalman.multi_predict(
-            multi_mean, multi_covariance
-        )
+        multi_mean, multi_covariance = kalman.multi_predict(multi_mean, multi_covariance)
         for st, mean, cov in zip(stracks, multi_mean, multi_covariance):
             st.mean, st.covariance = mean, cov
 
@@ -144,9 +140,7 @@ class STrack(BaseTrack):
 
     def re_activate(self, new_track, frame_id, new_id=False):
         """Re-activate a track with a new detection."""
-        self.mean, self.covariance = self.kalman_filter.update(
-            self.mean, self.covariance, new_track.xywh
-        )
+        self.mean, self.covariance = self.kalman_filter.update(self.mean, self.covariance, new_track.xywh)
         if new_track.curr_feat is not None:
             self.update_features(new_track.curr_feat)
         self.tracklet_len = 0
@@ -167,9 +161,7 @@ class STrack(BaseTrack):
         if not self.is_obb:
             self.history_observations.append(self.xyxy)
 
-        self.mean, self.covariance = self.kalman_filter.update(
-            self.mean, self.covariance, new_track.xywh
-        )
+        self.mean, self.covariance = self.kalman_filter.update(self.mean, self.covariance, new_track.xywh)
         if new_track.curr_feat is not None:
             self.update_features(new_track.curr_feat)
 
@@ -196,9 +188,7 @@ class STrack(BaseTrack):
         if self._plot_angle is None:
             self._plot_angle = target
         else:
-            self._plot_angle = self._plot_angle + self._wrap_pi_periodic(
-                target - self._plot_angle
-            )
+            self._plot_angle = self._plot_angle + self._wrap_pi_periodic(target - self._plot_angle)
         box[4] = self._plot_angle
         rect = (
             (float(box[0]), float(box[1])),

@@ -8,8 +8,7 @@ from boxmot.utils import logger as LOGGER
 
 
 class TFLiteBackend(BaseModelBackend):
-    """
-    A class to handle TensorFlow Lite model inference with dynamic batch size support.
+    """A class to handle TensorFlow Lite model inference with dynamic batch size support.
 
     Attributes:
         nhwc (bool): A flag indicating the order of dimensions.
@@ -19,8 +18,7 @@ class TFLiteBackend(BaseModelBackend):
     """
 
     def __init__(self, weights: Path, device: str, half: bool):
-        """
-        Initializes the TFLiteBackend with given weights, device, and precision flag.
+        """Initializes the TFLiteBackend with given weights, device, and precision flag.
 
         Args:
             weights (Path): Path to the TFLite model file.
@@ -34,15 +32,14 @@ class TFLiteBackend(BaseModelBackend):
         # self.current_allocated_batch_size: int = None
 
     def load_model(self, w):
-        """
-        Loads the TensorFlow Lite model and initializes the interpreter.
+        """Loads the TensorFlow Lite model and initializes the interpreter.
 
         Args:
             w (str): Path to the TFLite model file.
         """
         self.checker.check_packages(("tensorflow",))
 
-        LOGGER.info(f"Loading {str(w)} for TensorFlow Lite inference...")
+        LOGGER.info(f"Loading {w!s} for TensorFlow Lite inference...")
 
         import tensorflow as tf
 
@@ -54,8 +51,7 @@ class TFLiteBackend(BaseModelBackend):
         self.current_allocated_batch_size = self.input_details[0]["shape"][0]
 
     def forward(self, im_batch: torch.Tensor) -> np.ndarray:
-        """
-        Runs forward pass for the given image batch through the TFLite model.
+        """Runs forward pass for the given image batch through the TFLite model.
 
         Args:
             im_batch (torch.Tensor): Input image batch tensor.
@@ -71,9 +67,7 @@ class TFLiteBackend(BaseModelBackend):
         # Resize tensors if the new batch size is different from the current allocated batch size
         if batch_size != self.current_allocated_batch_size:
             # print(f"Resizing tensor input to batch size {batch_size}")
-            self.interpreter.resize_tensor_input(
-                self.input_details[0]["index"], [batch_size, 256, 128, 3]
-            )
+            self.interpreter.resize_tensor_input(self.input_details[0]["index"], [batch_size, 256, 128, 3])
             self.interpreter.allocate_tensors()
             self.current_allocated_batch_size = batch_size
 

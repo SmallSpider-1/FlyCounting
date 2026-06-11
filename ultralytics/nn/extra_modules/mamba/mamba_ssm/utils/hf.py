@@ -1,8 +1,7 @@
 import json
 
 import torch
-
-from transformers.utils import WEIGHTS_NAME, CONFIG_NAME
+from transformers.utils import CONFIG_NAME, WEIGHTS_NAME
 from transformers.utils.hub import cached_file
 
 
