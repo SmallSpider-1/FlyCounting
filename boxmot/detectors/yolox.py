@@ -5,15 +5,15 @@ import fnmatch
 import cv2
 import numpy as np
 import torch
-from ultralytics.engine.results import Results
-from ultralytics.models.yolo.detect import DetectionPredictor
 from yolox.exp import get_exp
 from yolox.utils import postprocess
 from yolox.utils.model_utils import fuse_model
 
 from boxmot.utils import logger as LOGGER
+from ultralytics.engine.results import Results
+from ultralytics.models.yolo.detect import DetectionPredictor
 
-# default model weigths for these model names
+# default model weights for these model names
 YOLOX_ZOO = {
     "yolox_n.pt": "https://drive.google.com/uc?id=1AoN2AxzVwOLM0gJ15bcwqZUpFjlDV1dX",
     "yolox_s.pt": "https://drive.google.com/uc?id=1uSmhXzyV1Zvb4TJJCzpsZOIcw7CCJLxj",
@@ -24,7 +24,7 @@ YOLOX_ZOO = {
     "yolox_x_MOT17_ablation.pt": "https://drive.google.com/uc?id=1iqhM-6V_r1FpOlOzrdP_Ejshgk0DxOob",
     "yolox_x_MOT20_ablation.pt": "https://drive.google.com/uc?id=1H1BxOfinONCSdQKnjGq0XlRxVUo_4M8o",
     "yolox_x_dancetrack_ablation.pt": "https://drive.google.com/uc?id=1ZKpYmFYCsRdXuOL60NRuc7VXAFYRskXB",
-    "yolox_x_visdrone.pt": "https://drive.google.com/uc?id=1ajehBs9enBHhuBqGIoQPGqkkzasE9d3o"
+    "yolox_x_visdrone.pt": "https://drive.google.com/uc?id=1ajehBs9enBHhuBqGIoQPGqkkzasE9d3o",
 }
 
 
@@ -59,10 +59,12 @@ def _patch_yolox_head_decode_outputs_for_mps() -> None:
         grids = []
         strides = []
         for (hsize, wsize), stride in zip(self.hw, self.strides):
-            yv, xv = meshgrid([
-                torch.arange(hsize, device=device),
-                torch.arange(wsize, device=device),
-            ])
+            yv, xv = meshgrid(
+                [
+                    torch.arange(hsize, device=device),
+                    torch.arange(wsize, device=device),
+                ]
+            )
             grid = torch.stack((xv, yv), 2).view(1, -1, 2)
             grids.append(grid)
             shape = grid.shape[:2]
@@ -85,7 +87,7 @@ _patch_yolox_head_decode_outputs_for_mps()
 
 class YoloXStrategy:
     """YOLOX strategy for use with Ultralytics predictor workflow."""
-    
+
     pt = False
     stride = 32
     fp16 = False
@@ -177,7 +179,7 @@ class YoloXStrategy:
 
         self.ch = 3
         self.args = args
-        raw = getattr(args, 'imgsz', None) or 640
+        raw = getattr(args, "imgsz", None) or 640
         vals = raw if isinstance(raw, (list, tuple)) else (raw,)
         w, h = (vals * 2)[:2]
         self.imgsz = [w, h]
@@ -193,26 +195,19 @@ class YoloXStrategy:
             exp_name = "yolox_nano"
         elif "_MOT" in model_type or "_dancetrack" in model_type or "_visdrone" in model_type:
             # Extract base model: yolox_x_MOT17_ablation / yolox_x_visdrone -> yolox_x
-            exp_name = (
-                model_type.split("_MOT")[0]
-                .split("_dancetrack")[0]
-                .split("_visdrone")[0]
-            )
+            exp_name = model_type.split("_MOT")[0].split("_dancetrack")[0].split("_visdrone")[0]
         else:
             exp_name = model_type
         exp = get_exp(None, exp_name)
 
-        LOGGER.info(f"Loading {model_type} with {str(model)}")
+        LOGGER.info(f"Loading {model_type} with {model!s}")
 
         # download crowdhuman bytetrack models
-        if not model.exists() and (
-            model.stem == model_type or fnmatch.fnmatch(model.stem, "yolox_x_*_ablation")
-        ):
+        if not model.exists() and (model.stem == model_type or fnmatch.fnmatch(model.stem, "yolox_x_*_ablation")):
             LOGGER.info("Downloading pretrained weights...")
             from boxmot.utils.download import download_file
-            download_file(
-                url=YOLOX_ZOO[model.stem + ".pt"], dest=model, overwrite=False
-            )
+
+            download_file(url=YOLOX_ZOO[model.stem + ".pt"], dest=model, overwrite=False)
             # needed for bytetrack yolox people models
             # update with your custom model needs
             exp.num_classes = 1
@@ -224,8 +219,8 @@ class YoloXStrategy:
         self.device = device
         self.model = exp.get_model()
         self.model.eval()
-        
-        # folow official yolox loading procedure
+
+        # follow official yolox loading procedure
         # https://github.com/Megvii-BaseDetection/YOLOX/blob/d872c71b/tools/eval.py#L148-L176
         self.model.to(self.device)
         self.model.eval()
@@ -237,7 +232,7 @@ class YoloXStrategy:
     def get_model_from_weigths(self, model_names, weight_path):
         for name in model_names:
             if name in str(weight_path):
-                return name.split('.')[0]
+                return name.split(".")[0]
         return "yolox_s"  # default
 
     @torch.no_grad()
@@ -260,13 +255,9 @@ class YoloXStrategy:
         pass
 
     def update_im_paths(self, predictor: DetectionPredictor):
+        """This function saves image paths for the current batch, being passed as callback on_predict_batch_start.
         """
-        This function saves image paths for the current batch,
-        being passed as callback on_predict_batch_start
-        """
-        assert isinstance(
-            predictor, DetectionPredictor
-        ), "Only ultralytics predictors are supported"
+        assert isinstance(predictor, DetectionPredictor), "Only ultralytics predictors are supported"
         self.im_paths = predictor.batch[0]
 
     # This preprocess differs from the current version of YOLOX preprocess, but ByteTrack uses it
@@ -333,9 +324,7 @@ class YoloXStrategy:
 
             if pred is None:
                 pred = torch.empty((0, 6))
-                r = Results(
-                    path=im_path, boxes=pred, orig_img=im0s[i], names=self.names
-                )
+                r = Results(path=im_path, boxes=pred, orig_img=im0s[i], names=self.names)
                 results.append(r)
             else:
                 ratio = self._preproc_data[i]
@@ -348,13 +337,9 @@ class YoloXStrategy:
 
                 # filter boxes by classes
                 if self.args.classes:
-                    pred = pred[
-                        torch.isin(pred[:, 5].cpu(), torch.as_tensor(self.args.classes))
-                    ]
+                    pred = pred[torch.isin(pred[:, 5].cpu(), torch.as_tensor(self.args.classes))]
 
-                r = Results(
-                    path=im_path, boxes=pred, orig_img=im0s[i], names=self.names
-                )
+                r = Results(path=im_path, boxes=pred, orig_img=im0s[i], names=self.names)
 
             results.append(r)
 

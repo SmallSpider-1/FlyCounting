@@ -10,8 +10,7 @@ from boxmot.utils import logger as LOGGER
 
 
 def linear_interpolation(data: np.ndarray, interval: int) -> np.ndarray:
-    """
-    Apply linear interpolation between rows in the tracking results.
+    """Apply linear interpolation between rows in the tracking results.
 
     Assumes col0=frame, col1=id. Interpolates gaps:
         previous_frame + 1 < current_frame < previous_frame + interval
@@ -37,9 +36,7 @@ def linear_interpolation(data: np.ndarray, interval: int) -> np.ndarray:
         ):
             gap = current_frame - previous_frame - 1
             for i in range(1, gap + 1):
-                new_row = previous_row + (row - previous_row) * (
-                    i / (current_frame - previous_frame)
-                )
+                new_row = previous_row + (row - previous_row) * (i / (current_frame - previous_frame))
                 result_rows.append(new_row)
 
         result_rows.append(row)
@@ -61,9 +58,7 @@ def gradient_boosting_smooth(
     learning_rate: float = 0.065,
     min_samples_split: int = 6,
 ) -> np.ndarray:
-    """
-    Smooth columns 2..5 (x,y,w,h) per track id using GradientBoostingRegressor.
-    """
+    """Smooth columns 2..5 (x,y,w,h) per track id using GradientBoostingRegressor."""
     if data.size == 0:
         return data
 
@@ -103,9 +98,7 @@ def process_file(
     learning_rate: float,
     min_samples_split: int,
 ):
-    """
-    Process a single MOT results file by applying linear interpolation and gradient boosting smoothing.
-    """
+    """Process a single MOT results file by applying linear interpolation and gradient boosting smoothing."""
     LOGGER.info(f"Applying GBRC/GBI to: {file_path}")
     tracking_results = np.loadtxt(file_path, delimiter=",")
 
@@ -140,9 +133,7 @@ def gbrc(
     learning_rate: float = 0.065,
     min_samples_split: int = 6,
 ):
-    """
-    Apply GBRC/GBI-style postprocessing to all MOT*.txt files in a folder.
-    """
+    """Apply GBRC/GBI-style postprocessing to all MOT*.txt files in a folder."""
     tracking_files = list(mot_results_folder.glob("MOT*.txt"))
     total_files = len(tracking_files)
     LOGGER.debug(f"GBRC: Found {total_files} file(s) to process.")

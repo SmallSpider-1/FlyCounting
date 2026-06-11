@@ -30,11 +30,11 @@ backbone:
 
 # YOLO26n head
 head:
-  - [-1, 1, DySample, [2, 'lp']]
+  - [-1, 1, DySample, [2, "lp"]]
   - [[-1, 6], 1, Concat, [1]] # cat backbone P4
   - [-1, 2, C3k2, [512, False]] # 13
 
-  - [-1, 1, DySample, [2, 'lp']]
+  - [-1, 1, DySample, [2, "lp"]]
   - [[-1, 4], 1, Concat, [1]] # cat backbone P3
   - [-1, 2, C3k2, [256, False]] # 16 (P3/8-small)
 
