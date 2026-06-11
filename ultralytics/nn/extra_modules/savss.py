@@ -1,24 +1,28 @@
 import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from einops import rearrange, repeat
-from timm.layers import to_2tuple, DropPath
+from einops import repeat
+from timm.layers import DropPath
 from torch.nn.init import trunc_normal_
 
 try:
     from mamba_ssm.ops.selective_scan_interface import selective_scan_fn
     from mamba_ssm.ops.triton.layer_norm import RMSNorm
-except Exception as e:
+except Exception:
     pass
 
-__all__ = ['SAVSS_Layer']
+__all__ = ["SAVSS_Layer"]
+
 
 class BottConv(nn.Module):
     def __init__(self, in_channels, out_channels, mid_channels, kernel_size, stride=1, padding=0, bias=True):
-        super(BottConv, self).__init__()
+        super().__init__()
         self.pointwise_1 = nn.Conv2d(in_channels, mid_channels, 1, bias=bias)
-        self.depthwise = nn.Conv2d(mid_channels, mid_channels, kernel_size, stride, padding, groups=mid_channels, bias=False)
+        self.depthwise = nn.Conv2d(
+            mid_channels, mid_channels, kernel_size, stride, padding, groups=mid_channels, bias=False
+        )
         self.pointwise_2 = nn.Conv2d(mid_channels, out_channels, 1, bias=False)
 
     def forward(self, x):
@@ -29,38 +33,38 @@ class BottConv(nn.Module):
 
 
 def get_norm_layer(norm_type, channels, num_groups):
-    if norm_type == 'GN':
+    if norm_type == "GN":
         return nn.GroupNorm(num_groups=num_groups, num_channels=channels)
     else:
         return nn.InstanceNorm3d(channels)
 
 
 class GBC(nn.Module):
-    def __init__(self, in_channels, norm_type='GN'):
-        super(GBC, self).__init__()
+    def __init__(self, in_channels, norm_type="GN"):
+        super().__init__()
 
         self.block1 = nn.Sequential(
             BottConv(in_channels, in_channels, in_channels // 8, 3, 1, 1),
             get_norm_layer(norm_type, in_channels, in_channels // 16),
-            nn.ReLU()
+            nn.ReLU(),
         )
 
         self.block2 = nn.Sequential(
             BottConv(in_channels, in_channels, in_channels // 8, 3, 1, 1),
             get_norm_layer(norm_type, in_channels, in_channels // 16),
-            nn.ReLU()
+            nn.ReLU(),
         )
 
         self.block3 = nn.Sequential(
             BottConv(in_channels, in_channels, in_channels // 8, 1, 1, 0),
             get_norm_layer(norm_type, in_channels, in_channels // 16),
-            nn.ReLU()
+            nn.ReLU(),
         )
 
         self.block4 = nn.Sequential(
             BottConv(in_channels, in_channels, in_channels // 8, 1, 1, 0),
             get_norm_layer(norm_type, in_channels, 16),
-            nn.ReLU()
+            nn.ReLU(),
         )
 
     def forward(self, x):
@@ -74,24 +78,25 @@ class GBC(nn.Module):
 
         return x + residual
 
+
 class PAF(nn.Module):
-    def __init__(self,
-                 in_channels: int,
-                 mid_channels: int,
-                 after_relu: bool = False,
-                 mid_norm: nn.Module = nn.BatchNorm2d,
-                 in_norm: nn.Module = nn.BatchNorm2d):
+    def __init__(
+        self,
+        in_channels: int,
+        mid_channels: int,
+        after_relu: bool = False,
+        mid_norm: nn.Module = nn.BatchNorm2d,
+        in_norm: nn.Module = nn.BatchNorm2d,
+    ):
         super().__init__()
         self.after_relu = after_relu
 
         self.feature_transform = nn.Sequential(
-            BottConv(in_channels, mid_channels, mid_channels=16, kernel_size=1),
-            mid_norm(mid_channels)
+            BottConv(in_channels, mid_channels, mid_channels=16, kernel_size=1), mid_norm(mid_channels)
         )
 
         self.channel_adapter = nn.Sequential(
-            BottConv(mid_channels, in_channels, mid_channels=16, kernel_size=1),
-            in_norm(in_channels)
+            BottConv(mid_channels, in_channels, mid_channels=16, kernel_size=1), in_norm(in_channels)
         )
 
         if after_relu:
@@ -106,9 +111,13 @@ class PAF(nn.Module):
 
         guidance_query = self.feature_transform(guidance_feat)
         base_key = self.feature_transform(base_feat)
-        guidance_query = F.interpolate(guidance_query, size=[base_shape[2], base_shape[3]], mode='bilinear', align_corners=False)
+        guidance_query = F.interpolate(
+            guidance_query, size=[base_shape[2], base_shape[3]], mode="bilinear", align_corners=False
+        )
         similarity_map = torch.sigmoid(self.channel_adapter(base_key * guidance_query))
-        resized_guidance = F.interpolate(guidance_feat, size=[base_shape[2], base_shape[3]], mode='bilinear', align_corners=False)
+        resized_guidance = F.interpolate(
+            guidance_feat, size=[base_shape[2], base_shape[3]], mode="bilinear", align_corners=False
+        )
 
         fused_feature = (1 - similarity_map) * base_feat + similarity_map * resized_guidance
 
@@ -117,21 +126,21 @@ class PAF(nn.Module):
 
 class SAVSS_2D(nn.Module):
     def __init__(
-            self,
-            d_model,
-            d_state=16,
-            expand=2,
-            dt_rank="auto",
-            dt_min=0.001,
-            dt_max=0.1,
-            dt_init="random",
-            dt_scale=1.0,
-            dt_init_floor=1e-4,
-            conv_size=7,
-            bias=False,
-            conv_bias=False,
-            init_layer_scale=None,
-            default_hw_shape=None,
+        self,
+        d_model,
+        d_state=16,
+        expand=2,
+        dt_rank="auto",
+        dt_min=0.001,
+        dt_max=0.1,
+        dt_init="random",
+        dt_scale=1.0,
+        dt_init_floor=1e-4,
+        conv_size=7,
+        bias=False,
+        conv_bias=False,
+        init_layer_scale=None,
+        default_hw_shape=None,
     ):
         super().__init__()
         self.d_model = d_model
@@ -147,23 +156,30 @@ class SAVSS_2D(nn.Module):
 
         self.init_layer_scale = init_layer_scale
         if init_layer_scale is not None:
-            self.gamma = nn.Parameter(init_layer_scale * torch.ones((d_model)), requires_grad=True)
+            self.gamma = nn.Parameter(init_layer_scale * torch.ones(d_model), requires_grad=True)
 
         self.in_proj = nn.Linear(self.d_model, self.d_inner * 2, bias=bias)
 
         assert conv_size % 2 == 1
-        self.conv2d = BottConv(in_channels=self.d_inner, out_channels=self.d_inner, mid_channels=self.d_inner // 16, kernel_size=3, padding=1, stride=1)
+        self.conv2d = BottConv(
+            in_channels=self.d_inner,
+            out_channels=self.d_inner,
+            mid_channels=self.d_inner // 16,
+            kernel_size=3,
+            padding=1,
+            stride=1,
+        )
         self.activation = "silu"
         self.act = nn.SiLU()
 
         self.x_proj = nn.Linear(
-            self.d_inner, self.dt_rank + self.d_state * 2, bias=False,
+            self.d_inner,
+            self.dt_rank + self.d_state * 2,
+            bias=False,
         )
-        self.dt_proj = nn.Linear(
-            self.dt_rank, self.d_inner, bias=True
-        )
+        self.dt_proj = nn.Linear(self.dt_rank, self.d_inner, bias=True)
 
-        dt_init_std = self.dt_rank ** -0.5 * dt_scale
+        dt_init_std = self.dt_rank**-0.5 * dt_scale
         if dt_init == "constant":
             nn.init.constant_(self.dt_proj.weight, dt_init_std)
         elif dt_init == "random":
@@ -171,10 +187,9 @@ class SAVSS_2D(nn.Module):
         else:
             raise NotImplementedError
 
-        dt = torch.exp(
-            torch.rand(self.d_inner) * (math.log(dt_max) - math.log(dt_min))
-            + math.log(dt_min)
-        ).clamp(min=dt_init_floor)
+        dt = torch.exp(torch.rand(self.d_inner) * (math.log(dt_max) - math.log(dt_min)) + math.log(dt_min)).clamp(
+            min=dt_init_floor
+        )
         inv_dt = dt + torch.log(-torch.expm1(-dt))
         with torch.no_grad():
             self.dt_proj.bias.copy_(inv_dt)
@@ -232,7 +247,7 @@ class SAVSS_2D(nn.Module):
                     i = i - 1
                     d1.append(3)
                     j_d = "right"
-        d1 = [0] + d1[:-1]
+        d1 = [0, *d1[:-1]]
 
         i, j = 0, 0
         i_d = "down"
@@ -257,7 +272,7 @@ class SAVSS_2D(nn.Module):
                     j = j + 1
                     d2.append(1)
                     i_d = "down"
-        d2 = [0] + d2[:-1]
+        d2 = [0, *d2[:-1]]
 
         for diag in range(H + W - 1):
             if diag % 2 == 0:
@@ -276,7 +291,7 @@ class SAVSS_2D(nn.Module):
                         o3.append(idx)
                         o3_inverse[idx] = len(o1) - 1
                         d3.append(4 if i == diag else 1)
-        d3 = [0] + d3[:-1]
+        d3 = [0, *d3[:-1]]
 
         for diag in range(H + W - 1):
             if diag % 2 == 0:
@@ -295,18 +310,20 @@ class SAVSS_2D(nn.Module):
                         o4.append(idx)
                         o4_inverse[idx] = len(o4) - 1
                         d4.append(4 if i == diag else 1)
-        d4 = [0] + d4[:-1]
+        d4 = [0, *d4[:-1]]
 
-        return (tuple(o1), tuple(o2), tuple(o3), tuple(o4)), \
-            (tuple(o1_inverse), tuple(o2_inverse), tuple(o3_inverse), tuple(o4_inverse)), \
-            (tuple(d1), tuple(d2), tuple(d3), tuple(d4))
+        return (
+            (tuple(o1), tuple(o2), tuple(o3), tuple(o4)),
+            (tuple(o1_inverse), tuple(o2_inverse), tuple(o3_inverse), tuple(o4_inverse)),
+            (tuple(d1), tuple(d2), tuple(d3), tuple(d4)),
+        )
 
     def forward(self, x, hw_shape):
         batch_size, L, _ = x.shape
         H, W = hw_shape
         E = self.d_inner
 
-        conv_state, ssm_state = None, None
+        _conv_state, ssm_state = None, None
         xz = self.in_proj(x)
         A = -torch.exp(self.A_log.float())
 
@@ -326,8 +343,9 @@ class SAVSS_2D(nn.Module):
 
         orders, inverse_orders, directions = self.sass(hw_shape)
         direction_Bs = [self.direction_Bs[d, :] for d in directions]
-        direction_Bs = [dB[None, :, :].expand(batch_size, -1, -1).permute(0, 2, 1).to(dtype=B.dtype) for dB in
-                        direction_Bs]
+        direction_Bs = [
+            dB[None, :, :].expand(batch_size, -1, -1).permute(0, 2, 1).to(dtype=B.dtype) for dB in direction_Bs
+        ]
 
         y_scan = [
             selective_scan_fn(
@@ -352,16 +370,17 @@ class SAVSS_2D(nn.Module):
 
         return out
 
+
 class SAVSS_Layer(nn.Module):
     def __init__(
-            self,
-            embed_dims,
-            use_rms_norm=False,
-            with_dwconv=False,
-            drop_path_rate=0.0,
+        self,
+        embed_dims,
+        use_rms_norm=False,
+        with_dwconv=False,
+        drop_path_rate=0.0,
     ):
 
-        super(SAVSS_Layer, self).__init__()
+        super().__init__()
         if use_rms_norm:
             self.norm = RMSNorm(embed_dims)
         else:
@@ -370,14 +389,7 @@ class SAVSS_Layer(nn.Module):
         self.with_dwconv = with_dwconv
         if self.with_dwconv:
             self.dw = nn.Sequential(
-                nn.Conv2d(
-                    embed_dims,
-                    embed_dims,
-                    kernel_size=(3, 3),
-                    padding=(1, 1),
-                    bias=False,
-                    groups=embed_dims
-                ),
+                nn.Conv2d(embed_dims, embed_dims, kernel_size=(3, 3), padding=(1, 1), bias=False, groups=embed_dims),
                 nn.BatchNorm2d(embed_dims),
                 nn.GELU(),
             )
@@ -402,8 +414,7 @@ class SAVSS_Layer(nn.Module):
 
         x = x.permute(0, 2, 3, 1).reshape(B, H * W, C)
         mixed_x = self.drop_path(self.SAVSS_2D(self.norm(x), hw_shape))
-        mixed_x = self.PAF_256(x.permute(0, 2, 1).reshape(B, C, H, W),
-                               mixed_x.permute(0, 2, 1).reshape(B, C, H, W))
+        mixed_x = self.PAF_256(x.permute(0, 2, 1).reshape(B, C, H, W), mixed_x.permute(0, 2, 1).reshape(B, C, H, W))
         mixed_x = self.GN_256(mixed_x).reshape(B, C, H * W).permute(0, 2, 1)
 
         if self.with_dwconv:

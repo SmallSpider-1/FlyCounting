@@ -10,10 +10,9 @@ import math
 
 import torch
 import torch.nn.functional as F
-from torch.cuda.amp import custom_fwd, custom_bwd
-
 import triton
 import triton.language as tl
+from torch.cuda.amp import custom_bwd, custom_fwd
 
 
 def layer_norm_ref(
@@ -59,15 +58,11 @@ def layer_norm_ref(
         x = x + x1
     if residual is not None:
         x = (x + residual).to(x.dtype)
-    out = F.layer_norm(x.to(weight.dtype), x.shape[-1:], weight=weight, bias=bias, eps=eps).to(
-        dtype
-    )
+    out = F.layer_norm(x.to(weight.dtype), x.shape[-1:], weight=weight, bias=bias, eps=eps).to(dtype)
     if weight1 is None:
         return out if not prenorm else (out, x)
     else:
-        out1 = F.layer_norm(
-            x.to(weight1.dtype), x.shape[-1:], weight=weight1, bias=bias1, eps=eps
-        ).to(dtype)
+        out1 = F.layer_norm(x.to(weight1.dtype), x.shape[-1:], weight=weight1, bias=bias1, eps=eps).to(dtype)
         return (out, out1) if not prenorm else (out, out1, x)
 
 
@@ -119,9 +114,7 @@ def rms_norm_ref(
     if weight1 is None:
         return out if not prenorm else (out, x)
     else:
-        out1 = ((x * rstd * weight1) + bias1 if bias1 is not None else (x * rstd * weight1)).to(
-            dtype
-        )
+        out1 = ((x * rstd * weight1) + bias1 if bias1 is not None else (x * rstd * weight1)).to(dtype)
         return (out, out1) if not prenorm else (out, out1, x)
 
 
@@ -213,9 +206,7 @@ def _layer_norm_fwd_1pass_kernel(
         if HAS_DROPOUT:
             # Compute dropout mask
             # 7 rounds is good enough, and reduces register pressure
-            keep_mask = (
-                tl.rand(tl.load(SEEDS + M + row).to(tl.uint32), cols, n_rounds=7) > dropout_p
-            )
+            keep_mask = tl.rand(tl.load(SEEDS + M + row).to(tl.uint32), cols, n_rounds=7) > dropout_p
             x1 = tl.where(keep_mask, x1 / (1.0 - dropout_p), 0.0)
             if STORE_DROPOUT_MASK:
                 tl.store(DROPOUT_MASK + (M + row) * N + cols, keep_mask, mask=cols < N)
@@ -317,9 +308,7 @@ def _layer_norm_fwd(
     mean = torch.empty((M,), dtype=torch.float32, device=x.device) if not is_rms_norm else None
     rstd = torch.empty((M,), dtype=torch.float32, device=x.device)
     if dropout_p > 0.0:
-        seeds = torch.randint(
-            2**32, (M if x1 is None else 2 * M,), device=x.device, dtype=torch.int64
-        )
+        seeds = torch.randint(2**32, (M if x1 is None else 2 * M,), device=x.device, dtype=torch.int64)
     else:
         seeds = None
     if return_dropout_mask and dropout_p > 0.0:
@@ -520,9 +509,7 @@ def _layer_norm_bwd_kernel(
             tl.store(DRESIDUAL_IN + cols, dx, mask=mask)
         if HAS_DX1:
             if HAS_DROPOUT:
-                keep_mask = (
-                    tl.rand(tl.load(SEEDS + M + row).to(tl.uint32), cols, n_rounds=7) > dropout_p
-                )
+                keep_mask = tl.rand(tl.load(SEEDS + M + row).to(tl.uint32), cols, n_rounds=7) > dropout_p
                 dx1 = tl.where(keep_mask, dx / (1.0 - dropout_p), 0.0)
             else:
                 dx1 = dx
@@ -607,15 +594,10 @@ def _layer_norm_bwd(
         assert rowscale.is_contiguous()
         assert rowscale.shape == (M,)
     # allocate output
-    dx = (
-        torch.empty_like(x)
-        if x_dtype is None
-        else torch.empty(M, N, dtype=x_dtype, device=x.device)
-    )
+    dx = torch.empty_like(x) if x_dtype is None else torch.empty(M, N, dtype=x_dtype, device=x.device)
     dresidual_in = (
         torch.empty_like(x)
-        if has_residual
-        and (dx.dtype != x.dtype or dropout_p > 0.0 or rowscale is not None or has_x1)
+        if has_residual and (dx.dtype != x.dtype or dropout_p > 0.0 or rowscale is not None or has_x1)
         else None
     )
     dx1 = torch.empty_like(dx) if (has_x1 and dropout_p > 0.0) else None
@@ -630,11 +612,7 @@ def _layer_norm_bwd(
         raise RuntimeError("This layer norm doesn't support feature dim >= 64KB.")
     sm_count = torch.cuda.get_device_properties(x.device).multi_processor_count
     _dw = torch.empty((sm_count, N), dtype=torch.float32, device=weight.device)
-    _db = (
-        torch.empty((sm_count, N), dtype=torch.float32, device=bias.device)
-        if bias is not None
-        else None
-    )
+    _db = torch.empty((sm_count, N), dtype=torch.float32, device=bias.device) if bias is not None else None
     _dw1 = torch.empty_like(_dw) if weight1 is not None else None
     _db1 = torch.empty_like(_db) if bias1 is not None else None
     rows_per_program = math.ceil(M / sm_count)
@@ -740,11 +718,7 @@ class LayerNormFn(torch.autograd.Function):
             bias1 = bias1.contiguous()
         if rowscale is not None:
             rowscale = rowscale.reshape(-1).contiguous()
-        residual_dtype = (
-            residual.dtype
-            if residual is not None
-            else (torch.float32 if residual_in_fp32 else None)
-        )
+        residual_dtype = residual.dtype if residual is not None else (torch.float32 if residual_in_fp32 else None)
         y, y1, mean, rstd, residual_out, seeds, dropout_mask, dropout_mask1 = _layer_norm_fwd(
             x,
             weight,
@@ -760,9 +734,7 @@ class LayerNormFn(torch.autograd.Function):
             is_rms_norm=is_rms_norm,
             return_dropout_mask=return_dropout_mask,
         )
-        ctx.save_for_backward(
-            residual_out, weight, bias, weight1, bias1, rowscale, seeds, mean, rstd
-        )
+        ctx.save_for_backward(residual_out, weight, bias, weight1, bias1, rowscale, seeds, mean, rstd)
         ctx.x_shape_og = x_shape_og
         ctx.eps = eps
         ctx.dropout_p = dropout_p
@@ -784,9 +756,7 @@ class LayerNormFn(torch.autograd.Function):
         else:
             if weight1 is None:
                 return (
-                    (y, dropout_mask, dropout_mask1)
-                    if not prenorm
-                    else (y, residual_out, dropout_mask, dropout_mask1)
+                    (y, dropout_mask, dropout_mask1) if not prenorm else (y, residual_out, dropout_mask, dropout_mask1)
                 )
             else:
                 return (
@@ -924,7 +894,6 @@ def rms_norm_fn(
 
 
 class RMSNorm(torch.nn.Module):
-
     def __init__(self, hidden_size, eps=1e-5, dropout_p=0.0, device=None, dtype=None):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
@@ -982,12 +951,8 @@ class LayerNormLinearFn(torch.autograd.Function):
         norm_weight = norm_weight.contiguous()
         if norm_bias is not None:
             norm_bias = norm_bias.contiguous()
-        residual_dtype = (
-            residual.dtype
-            if residual is not None
-            else (torch.float32 if residual_in_fp32 else None)
-        )
-        y, _, mean, rstd, residual_out, *rest = _layer_norm_fwd(
+        residual_dtype = residual.dtype if residual is not None else (torch.float32 if residual_in_fp32 else None)
+        y, _, mean, rstd, residual_out, *_rest = _layer_norm_fwd(
             x,
             norm_weight,
             norm_bias,
@@ -1015,11 +980,11 @@ class LayerNormLinearFn(torch.autograd.Function):
 
     @staticmethod
     @custom_bwd
-    def backward(ctx, dout, *args):
+    def backward(ctx, doubt, *args):
         x, norm_weight, norm_bias, linear_weight, mean, rstd = ctx.saved_tensors
-        dout = dout.reshape(-1, dout.shape[-1])
-        dy = F.linear(dout, linear_weight.t())
-        dlinear_bias = None if ctx.linear_bias_is_none else dout.sum(0)
+        doubt = doubt.reshape(-1, doubt.shape[-1])
+        dy = F.linear(doubt, linear_weight.t())
+        dlinear_bias = None if ctx.linear_bias_is_none else doubt.sum(0)
         if dy.stride(-1) != 1:
             dy = dy.contiguous()
         assert dy.shape == x.shape
@@ -1045,7 +1010,7 @@ class LayerNormLinearFn(torch.autograd.Function):
             x_dtype=ctx.x_dtype,
             recompute_output=True,
         )
-        dlinear_weight = torch.einsum("bo,bi->oi", dout, y)
+        dlinear_weight = torch.einsum("bo,bi->oi", doubt, y)
         return (
             dx.reshape(ctx.x_shape_og),
             dnorm_weight,
