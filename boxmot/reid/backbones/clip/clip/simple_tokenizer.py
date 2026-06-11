@@ -10,27 +10,20 @@ import regex as re
 from boxmot.utils import BOXMOT
 
 
-@lru_cache()
+@lru_cache
 def default_bpe():
     return BOXMOT / "reid/backbones/clip/clip/bpe_simple_vocab_16e6.txt.gz"
 
 
-@lru_cache()
+@lru_cache
 def bytes_to_unicode():
+    """Returns list of utf-8 byte and a corresponding list of unicode strings. The reversible bpe codes work on unicode
+    strings. This means you need a large # of unicode characters in your vocab if you want to avoid UNKs. When
+    you're at something like a 10B token dataset you end up needing around 5K for decent coverage. This is a
+    significant percentage of your normal, say, 32K bpe vocab. To avoid that, we want lookup tables between utf-8
+    bytes and unicode strings. And avoids mapping to whitespace/control characters the bpe code barfs on.
     """
-    Returns list of utf-8 byte and a corresponding list of unicode strings.
-    The reversible bpe codes work on unicode strings.
-    This means you need a large # of unicode characters in your vocab if you want to avoid UNKs.
-    When you're at something like a 10B token dataset you end up needing around 5K for decent coverage.
-    This is a signficant percentage of your normal, say, 32K bpe vocab.
-    To avoid that, we want lookup tables between utf-8 bytes and unicode strings.
-    And avoids mapping to whitespace/control characters the bpe code barfs on.
-    """
-    bs = (
-        list(range(ord("!"), ord("~") + 1))
-        + list(range(ord("¡"), ord("¬") + 1))
-        + list(range(ord("®"), ord("ÿ") + 1))
-    )
+    bs = list(range(ord("!"), ord("~") + 1)) + list(range(ord("¡"), ord("¬") + 1)) + list(range(ord("®"), ord("ÿ") + 1))
     cs = bs[:]
     n = 0
     for b in range(2**8):
@@ -43,8 +36,8 @@ def bytes_to_unicode():
 
 
 def get_pairs(word):
-    """Return set of symbol pairs in a word.
-    Word is represented as tuple of symbols (symbols being variable-length strings).
+    """Return set of symbol pairs in a word. Word is represented as tuple of symbols (symbols being variable-length
+    strings).
     """
     pairs = set()
     prev_char = word[0]
@@ -66,7 +59,7 @@ def whitespace_clean(text):
     return text
 
 
-class SimpleTokenizer(object):
+class SimpleTokenizer:
     def __init__(self, bpe_path: str = default_bpe()):
         self.byte_encoder = bytes_to_unicode()
         self.byte_decoder = {v: k for k, v in self.byte_encoder.items()}
@@ -88,12 +81,12 @@ class SimpleTokenizer(object):
         self.pat = re.compile(
             r"""<\|startoftext\|>|<\|endoftext\|>|'s|'t|'re|'ve|'m|'ll|'d|[\p{L}]+|[\p{N}]|[^\s\p{L}\p{N}]+""",
             re.IGNORECASE,
-        )  # noqa: E501
+        )
 
     def bpe(self, token):
         if token in self.cache:
             return self.cache[token]
-        word = tuple(token[:-1]) + (token[-1] + "</w>",)
+        word = (*tuple(token[:-1]), token[-1] + "</w>")
         pairs = get_pairs(word)
 
         if not pairs:
@@ -112,7 +105,6 @@ class SimpleTokenizer(object):
                     new_word.extend(word[i:j])
                     i = j
                 except Exception:
-
                     new_word.extend(word[i:])
                     break
 
@@ -137,16 +129,10 @@ class SimpleTokenizer(object):
         text = whitespace_clean(basic_clean(text)).lower()
         for token in re.findall(self.pat, text):
             token = "".join(self.byte_encoder[b] for b in token.encode("utf-8"))
-            bpe_tokens.extend(
-                self.encoder[bpe_token] for bpe_token in self.bpe(token).split(" ")
-            )
+            bpe_tokens.extend(self.encoder[bpe_token] for bpe_token in self.bpe(token).split(" "))
         return bpe_tokens
 
     def decode(self, tokens):
         text = "".join([self.decoder[token] for token in tokens])
-        text = (
-            bytearray([self.byte_decoder[c] for c in text])
-            .decode("utf-8", errors="replace")
-            .replace("</w>", " ")
-        )
+        text = bytearray([self.byte_decoder[c] for c in text]).decode("utf-8", errors="replace").replace("</w>", " ")
         return text
