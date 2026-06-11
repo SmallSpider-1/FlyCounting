@@ -6,7 +6,7 @@
   "before": {
     "parameters": 2504190,
     "zero_parameters": 73,
-    "zero_parameter_ratio": 2.9151142684860173e-05,
+    "zero_parameter_ratio": 2.9151142684860173e-5,
     "prunable_conv_layers": 76,
     "structured_zero_channels": {}
   },

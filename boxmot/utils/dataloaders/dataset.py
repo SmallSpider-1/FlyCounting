@@ -1,5 +1,5 @@
 """
-MOT Dataset Loader
+MOT Dataset Loader.
 ==================
 
 Provides :class:`MOTDataset` and :class:`MOTSequence` for loading and iterating
@@ -10,7 +10,7 @@ Expected dataset layout
 
 The MOT sequence format (used by MOTChallenge and supported by annotation tools
 such as `CVAT <https://docs.cvat.ai/docs/dataset_management/formats/format-mot/>`_)
-organises data as follows::
+organizes data as follows::
 
     <dataset_root>/
     ├── <sequence_1>/
@@ -63,10 +63,12 @@ An INI file with at least a ``[Sequence]`` section that can contain::
 a ``target_fps`` is provided.
 """
 
+from __future__ import annotations
+
 import configparser
 import shutil
+from collections.abc import Generator
 from pathlib import Path
-from typing import Dict, Generator, List, Optional, Union
 
 import cv2
 import numpy as np
@@ -115,9 +117,8 @@ def compute_fps_mask(frames: np.ndarray, orig_fps: int, target_fps: int) -> np.n
 class MOTDataset:
     """Dataset class for MOT-format sequences with optional detection and embedding data.
 
-    Scans ``mot_root`` for sequence sub-directories that follow the standard
-    MOT layout (see module docstring).  When *det_emb_root*, *model_name* and
-    *reid_name* are provided, pre-computed detections and ReID embeddings are
+    Scans ``mot_root`` for sequence sub-directories that follow the standard MOT layout (see module docstring). When
+    *det_emb_root*, *model_name* and *reid_name* are provided, pre-computed detections and ReID embeddings are
     associated with each sequence.
 
     Args:
@@ -125,26 +126,26 @@ class MOTDataset:
         det_emb_root: Root path for detection and embedding outputs.
         model_name: Name of the detection model used.
         reid_name: Name of the re-identification model used.
-        target_fps: FPS to downsample to.  When set, the ``seqinfo.ini``
-            inside each sequence is read to determine the original frame rate.
+        target_fps: FPS to downsample to. When set, the ``seqinfo.ini`` inside each sequence is read to determine the
+            original frame rate.
     """
 
     def __init__(
         self,
         mot_root: str,
-        det_emb_root: Optional[str] = None,
-        model_name: Optional[str] = None,
-        reid_name: Optional[str] = None,
-        target_fps: Optional[int] = None
+        det_emb_root: str | None = None,
+        model_name: str | None = None,
+        reid_name: str | None = None,
+        target_fps: int | None = None,
     ):
         self.root = Path(mot_root)
         self.target_fps = target_fps
-        self.seqs: Dict[str, Dict] = {}
+        self.seqs: dict[str, dict] = {}
 
         if det_emb_root and model_name and reid_name:
             base = Path(det_emb_root) / model_name
-            self.dets_dir = base / 'dets'
-            self.embs_dir = base / 'embs' / reid_name
+            self.dets_dir = base / "dets"
+            self.embs_dir = base / "embs" / reid_name
         else:
             self.dets_dir = self.embs_dir = None
 
@@ -162,30 +163,30 @@ class MOTDataset:
             if not seq_dir.is_dir():
                 continue
             name = seq_dir.name
-            img_dir = seq_dir / 'img1'
+            img_dir = seq_dir / "img1"
             if not img_dir.exists():
                 img_dir = seq_dir
-            imgs = sorted(list(img_dir.glob('*.jpg')) + list(img_dir.glob('*.png')))
+            imgs = sorted(list(img_dir.glob("*.jpg")) + list(img_dir.glob("*.png")))
             if not imgs:
                 continue
             frame_ids = [int(p.stem) for p in imgs]
 
-            det_path = self.dets_dir / f'{name}.txt' if self.dets_dir else None
-            emb_path = self.embs_dir / f'{name}.txt' if self.embs_dir else None
+            det_path = self.dets_dir / f"{name}.txt" if self.dets_dir else None
+            emb_path = self.embs_dir / f"{name}.txt" if self.embs_dir else None
 
             self.seqs[name] = {
-                'seq_dir': seq_dir,
-                'frame_ids': np.array(frame_ids, dtype=int),
-                'frame_paths': imgs,
-                'det_path': det_path,
-                'emb_path': emb_path
+                "seq_dir": seq_dir,
+                "frame_ids": np.array(frame_ids, dtype=int),
+                "frame_paths": imgs,
+                "det_path": det_path,
+                "emb_path": emb_path,
             }
 
-    def sequence_names(self) -> List[str]:
+    def sequence_names(self) -> list[str]:
         """Return the list of all available sequence names."""
         return list(self.seqs.keys())
 
-    def get_sequence(self, name: str) -> "MOTSequence":
+    def get_sequence(self, name: str) -> MOTSequence:
         """Return a :class:`MOTSequence` iterator for the given sequence.
 
         Args:
@@ -207,14 +208,12 @@ class MOTSequence:
     * ``frame_id`` – integer frame number (1-based).
     * ``img`` – BGR image as a NumPy array (loaded via OpenCV).
     * ``dets`` – ``(N, D)`` detection array for the frame (columns after
-      ``frame_id`` from the detections file).
+    ``frame_id`` from the detections file).
     * ``embs`` – ``(N, E)`` ReID embedding array aligned with *dets*.
 
-    When *target_fps* is set and a ``seqinfo.ini`` with ``frameRate`` is
-    present, frames (together with detections, embeddings and ground truth)
-    are subsampled accordingly.  A temporary ``gt_temp.txt`` is written
-    next to the original ``gt.txt`` so that evaluation tools can use the
-    filtered annotations.
+    When *target_fps* is set and a ``seqinfo.ini`` with ``frameRate`` is present, frames (together with detections,
+    embeddings and ground truth) are subsampled accordingly. A temporary ``gt_temp.txt`` is written next to the original
+    ``gt.txt`` so that evaluation tools can use the filtered annotations.
 
     Args:
         name: Sequence name.
@@ -222,14 +221,14 @@ class MOTSequence:
         target_fps: Desired FPS for downsampling.
     """
 
-    def __init__(self, name: str, meta: Dict, target_fps: Optional[int]):
+    def __init__(self, name: str, meta: dict, target_fps: int | None):
         self.name = name
         self.meta = meta
         self.target_fps = target_fps
-        self.dets: Optional[np.ndarray] = None
-        self.embs: Optional[np.ndarray] = None
-        self.frame_ids: np.ndarray = meta['frame_ids']
-        self.frame_paths: List[Path] = meta['frame_paths']
+        self.dets: np.ndarray | None = None
+        self.embs: np.ndarray | None = None
+        self.frame_ids: np.ndarray = meta["frame_ids"]
+        self.frame_paths: list[Path] = meta["frame_paths"]
         self._prepare()
 
     def _prepare(self) -> None:
@@ -239,22 +238,22 @@ class MOTSequence:
         when downsampling, or a copy of gt.txt when nothing changed.
         """
         updated_gt = False
-        gt_dir = self.meta['seq_dir'] / 'gt'
+        gt_dir = self.meta["seq_dir"] / "gt"
 
         # 1) Load dets & embs
-        if self.meta['det_path'] and self.meta['emb_path']:
-            self.dets = np.loadtxt(self.meta['det_path'], comments="#")
-            self.embs = np.loadtxt(self.meta['emb_path'], comments="#")
+        if self.meta["det_path"] and self.meta["emb_path"]:
+            self.dets = np.loadtxt(self.meta["det_path"], comments="#")
+            self.embs = np.loadtxt(self.meta["emb_path"], comments="#")
             if self.dets.shape[0] != self.embs.shape[0]:
                 raise ValueError(f"Row mismatch in {self.name}")
 
             # 2) If target_fps is set, build a frame mask using seqinfo.ini
             if self.target_fps:
-                seq_info_file = self.meta['seq_dir'] / 'seqinfo.ini'
+                seq_info_file = self.meta["seq_dir"] / "seqinfo.ini"
                 if not seq_info_file.exists():
                     LOGGER.warning(f"Missing seqinfo.ini in {self.meta['seq_dir']}, skipping FPS downsample")
                 else:
-                    orig_fps = read_seq_fps(self.meta['seq_dir'])
+                    orig_fps = read_seq_fps(self.meta["seq_dir"])
                     mask = compute_fps_mask(self.dets[:, 0], orig_fps, self.target_fps)
 
                     # a) Filter dets / embs / frame_ids / frame_paths
@@ -266,22 +265,22 @@ class MOTSequence:
                     self.frame_paths = [self.frame_paths[i] for i in idxs_to_keep]
 
                     # b) Filter GT and write gt_temp.txt for evaluation
-                    orig_gt = np.loadtxt(gt_dir / 'gt.txt', delimiter=',')
+                    orig_gt = np.loadtxt(gt_dir / "gt.txt", delimiter=",")
                     gt_mask = np.isin(orig_gt[:, 0].astype(int), list(keep_ids))
                     filtered_gt = orig_gt[gt_mask]
                     np.savetxt(
-                        gt_dir / 'gt_temp.txt',
+                        gt_dir / "gt_temp.txt",
                         filtered_gt,
-                        delimiter=',',
-                        fmt="%d" if filtered_gt.dtype.kind in 'iu' else "%f",
+                        delimiter=",",
+                        fmt="%d" if filtered_gt.dtype.kind in "iu" else "%f",
                     )
                     updated_gt = True
 
         # 3) Ensure gt_temp.txt always exists for the evaluator (copy gt.txt if unchanged)
-        if (gt_dir / 'gt.txt').exists() and not updated_gt:
-            shutil.copy2(gt_dir / 'gt.txt', gt_dir / 'gt_temp.txt')
+        if (gt_dir / "gt.txt").exists() and not updated_gt:
+            shutil.copy2(gt_dir / "gt.txt", gt_dir / "gt_temp.txt")
 
-    def __iter__(self) -> Generator[Dict[str, Union[int, np.ndarray]], None, None]:
+    def __iter__(self) -> Generator[dict[str, int | np.ndarray], None, None]:
         """Yield frame dictionaries one by one.
 
         Yields:
@@ -298,19 +297,14 @@ class MOTSequence:
                 continue
 
             if self.dets is not None:
-                mask = (self.dets[:, 0].astype(int) == fid)
+                mask = self.dets[:, 0].astype(int) == fid
                 dets_f = self.dets[mask, 1:]
                 embs_f = self.embs[mask]
             else:
                 dets_f = np.zeros((0, 5))
                 embs_f = np.zeros((0, 128))
 
-            yield {
-                'frame_id': fid,
-                'img': img,
-                'dets': dets_f,
-                'embs': embs_f
-            }
+            yield {"frame_id": fid, "img": img, "dets": dets_f, "embs": embs_f}
 
 
 def process_sequences_lazily(dataset: MOTDataset) -> None:
@@ -322,11 +316,7 @@ def process_sequences_lazily(dataset: MOTDataset) -> None:
     for seq_name in dataset.sequence_names():
         LOGGER.info(f"Processing sequence: {seq_name}")
         for frame_data in dataset.get_sequence(seq_name):
-            print(
-                f"Seq: {seq_name}, "
-                f"Frame: {frame_data['frame_id']}, "
-                f"Dets: {frame_data['dets'].shape[0]}"
-            )
+            print(f"Seq: {seq_name}, Frame: {frame_data['frame_id']}, Dets: {frame_data['dets'].shape[0]}")
 
 
 if __name__ == "__main__":
@@ -335,7 +325,7 @@ if __name__ == "__main__":
         det_emb_root="./runs/dets_n_embs",
         model_name="yolox_x_ablation",
         reid_name="lmbn_n_duke",
-        target_fps=15
+        target_fps=15,
     )
 
     process_sequences_lazily(dataset)
