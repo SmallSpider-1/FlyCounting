@@ -2,22 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 import cv2
 import numpy as np
 
 from boxmot.motion.cmc.base_cmc import BaseCMC
-from boxmot.utils import logger as LOGGER
 
 
 class SOF(BaseCMC):
-    """
-    Sparse Optical Flow tracker estimating a 2x3 affine partial transform between frames.
-    Uses:
-      - goodFeaturesToTrack for keypoints
-      - calcOpticalFlowPyrLK for tracking
-      - estimateAffinePartial2D (RANSAC) for robust motion estimation
+    """Sparse Optical Flow tracker estimating a 2x3 affine partial transform between frames. Uses: - goodFeaturesToTrack
+    for keypoints - calcOpticalFlowPyrLK for tracking - estimateAffinePartial2D (RANSAC) for robust
+    motion estimation.
     """
 
     def __init__(self, scale: float = 0.15) -> None:
@@ -39,11 +33,11 @@ class SOF(BaseCMC):
             criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01),
         )
 
-        self.prev_frame: Optional[np.ndarray] = None
-        self.prev_keypoints: Optional[np.ndarray] = None
+        self.prev_frame: np.ndarray | None = None
+        self.prev_keypoints: np.ndarray | None = None
         self.initialized: bool = False
 
-    def apply(self, img: np.ndarray, dets: Optional[np.ndarray] = None) -> np.ndarray:
+    def apply(self, img: np.ndarray, dets: np.ndarray | None = None) -> np.ndarray:
         frame_gray = self.preprocess(img)
         H = np.eye(2, 3, dtype=np.float32)
 
@@ -85,7 +79,7 @@ class SOF(BaseCMC):
             return H
 
         # estimate transform
-        H_est, inliers = cv2.estimateAffinePartial2D(prev_valid, next_valid, method=cv2.RANSAC)
+        H_est, _inliers = cv2.estimateAffinePartial2D(prev_valid, next_valid, method=cv2.RANSAC)
         if H_est is None:
             H_est = H
         else:

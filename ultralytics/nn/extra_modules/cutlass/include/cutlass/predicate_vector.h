@@ -107,7 +107,7 @@ corresponding to the access (d, h, w, c) within the tile.
 /// Statically sized array of bits implementing
 /// @concept{predicate_vector_concept}.
 template <
-        /// Number of predicates conatined in predicate vector
+        /// Number of predicates contained in predicate vector
         int kPredicates_,
         /// Number of predicates contained in each byte of internal storage
         int kPredicatesPerByte_ = 4,
@@ -120,7 +120,7 @@ struct PredicateVector {
     /// Number of bits stored within each byte of the predicate bit vector
     static int const kPredicatesPerByte = kPredicatesPerByte_;
 
-    /// First bit withing each byte containing predicates
+    /// First bit within each byte containing predicates
     static int const kPredicateStart = kPredicateStart_;
 
     // Make sure no one tries to put more than 8 bits in a byte :)

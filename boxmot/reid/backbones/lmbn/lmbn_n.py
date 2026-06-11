@@ -12,7 +12,7 @@ from boxmot.reid.backbones.osnet import OSBlock, osnet_x1_0
 
 class LMBN_n(nn.Module):
     def __init__(self, num_classes, loss, pretrained, use_gpu):
-        super(LMBN_n, self).__init__()
+        super().__init__()
 
         self.n_ch = 2
         self.chs = 512 // self.n_ch
@@ -20,15 +20,11 @@ class LMBN_n(nn.Module):
 
         osnet = osnet_x1_0(pretrained=False)
 
-        self.backone = nn.Sequential(
-            osnet.conv1, osnet.maxpool, osnet.conv2, osnet.conv3[0]
-        )
+        self.backone = nn.Sequential(osnet.conv1, osnet.maxpool, osnet.conv2, osnet.conv3[0])
 
         conv3 = osnet.conv3[1:]
 
-        self.global_branch = nn.Sequential(
-            copy.deepcopy(conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5)
-        )
+        self.global_branch = nn.Sequential(copy.deepcopy(conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5))
 
         self.partial_branch = nn.Sequential(
             copy.deepcopy(conv3), copy.deepcopy(osnet.conv4), copy.deepcopy(osnet.conv5)
@@ -50,9 +46,7 @@ class LMBN_n(nn.Module):
         self.reduction_3 = copy.deepcopy(reduction)
         self.reduction_4 = copy.deepcopy(reduction)
 
-        self.shared = nn.Sequential(
-            nn.Conv2d(self.chs, 512, 1, bias=False), nn.BatchNorm2d(512), nn.ReLU(True)
-        )
+        self.shared = nn.Sequential(nn.Conv2d(self.chs, 512, 1, bias=False), nn.BatchNorm2d(512), nn.ReLU(True))
         self.weights_init_kaiming(self.shared)
 
         self.reduction_ch_0 = BNNeck(512, num_classes, return_f=True)

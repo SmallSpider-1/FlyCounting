@@ -5,8 +5,8 @@ from collections import deque
 import cv2
 import numpy as np
 
-from boxmot.motion.kalman_filters.xywh import KalmanFilterXYWH
 from boxmot.motion.kalman_filters.xyah import KalmanFilterXYAH
+from boxmot.motion.kalman_filters.xywh import KalmanFilterXYWH
 from boxmot.trackers.basetracker import BaseTracker
 from boxmot.trackers.bytetrack.basetrack import BaseTrack, TrackState
 from boxmot.utils.matching import fuse_score, iou_distance, linear_assignment
@@ -30,7 +30,7 @@ class STrack(BaseTrack):
         self.mean, self.covariance = None, None
         self.is_activated = False
         self.tracklet_len = 0
-        self.history_observations = deque([], maxlen=self.max_obs)
+        self.history_observations = deque(maxlen=self.max_obs)
         self._plot_angle = None
 
     def _init_from_aabb_detection(self, det: np.ndarray) -> None:
@@ -56,9 +56,7 @@ class STrack(BaseTrack):
                 mean_state[7:10] = 0
             else:
                 mean_state[7] = 0
-        self.mean, self.covariance = self.kalman_filter.predict(
-            mean_state, self.covariance
-        )
+        self.mean, self.covariance = self.kalman_filter.predict(mean_state, self.covariance)
 
     @staticmethod
     def multi_predict(stracks):
@@ -73,20 +71,16 @@ class STrack(BaseTrack):
                     else:
                         multi_mean[i][7] = 0
             kalman = STrack.shared_kalman_obb if is_obb else STrack.shared_kalman
-            multi_mean, multi_covariance = kalman.multi_predict(
-                multi_mean, multi_covariance
-            )
+            multi_mean, multi_covariance = kalman.multi_predict(multi_mean, multi_covariance)
             for i, (mean, cov) in enumerate(zip(multi_mean, multi_covariance)):
                 stracks[i].mean = mean
                 stracks[i].covariance = cov
 
     def activate(self, kalman_filter, frame_id):
-        """Start a new tracklet"""
+        """Start a new tracklet."""
         self.kalman_filter = kalman_filter
         self.id = self.next_id()
-        self.mean, self.covariance = self.kalman_filter.initiate(
-            self.xywh if self.is_obb else self.xyah
-        )
+        self.mean, self.covariance = self.kalman_filter.initiate(self.xywh if self.is_obb else self.xyah)
 
         self.tracklet_len = 0
         self.state = TrackState.Tracked
@@ -153,9 +147,7 @@ class STrack(BaseTrack):
         if self._plot_angle is None:
             self._plot_angle = target
         else:
-            self._plot_angle = self._plot_angle + self._wrap_pi_periodic(
-                target - self._plot_angle
-            )
+            self._plot_angle = self._plot_angle + self._wrap_pi_periodic(target - self._plot_angle)
         box[4] = self._plot_angle
         rect = (
             (float(box[0]), float(box[1])),
@@ -167,8 +159,7 @@ class STrack(BaseTrack):
 
     @property
     def xyxy(self):
-        """Convert bounding box to format `(min x, min y, max x, max y)`, i.e.,
-        `(top left, bottom right)`.
+        """Convert bounding box to format `(min x, min y, max x, max y)`, i.e., `(top left, bottom right)`.
         """
         if self.is_obb:
             cx, cy, w, h, angle = self.xywha
@@ -236,12 +227,12 @@ class ByteTrack(BaseTracker):
         match_thresh: float = 0.8,
         track_buffer: int = 25,
         frame_rate: int = 30,
-        **kwargs  # BaseTracker parameters
+        **kwargs,  # BaseTracker parameters
     ):
         # Capture all init params for logging
-        init_args = {k: v for k, v in locals().items() if k not in ('self', 'kwargs')}
-        super().__init__(**init_args, _tracker_name='ByteTrack', **kwargs)
-        
+        init_args = {k: v for k, v in locals().items() if k not in ("self", "kwargs")}
+        super().__init__(**init_args, _tracker_name="ByteTrack", **kwargs)
+
         # Track lifecycle parameters
         self.frame_id = 0
         self.track_buffer = track_buffer
@@ -256,16 +247,14 @@ class ByteTrack(BaseTracker):
 
         # Motion model
         self.kalman_filter = KalmanFilterXYAH()
-        
+
         self.active_tracks = []  # type: list[STrack]
         self.lost_stracks = []  # type: list[STrack]
         self.removed_stracks = []  # type: list[STrack]
 
     @BaseTracker.setup_decorator
     @BaseTracker.per_class_decorator
-    def update(
-        self, dets: np.ndarray, img: np.ndarray = None, embs: np.ndarray = None
-    ) -> np.ndarray:
+    def update(self, dets: np.ndarray, img: np.ndarray = None, embs: np.ndarray = None) -> np.ndarray:
 
         self.check_inputs(dets, img)
 
@@ -309,9 +298,7 @@ class ByteTrack(BaseTracker):
         dists = iou_distance(strack_pool, detections, is_obb=self.is_obb)
         # if not self.args.mot20:
         dists = fuse_score(dists, detections)
-        matches, u_track, u_detection = linear_assignment(
-            dists, thresh=self.match_thresh
-        )
+        matches, u_track, u_detection = linear_assignment(dists, thresh=self.match_thresh)
 
         for itracked, idet in matches:
             track = strack_pool[itracked]
@@ -328,18 +315,13 @@ class ByteTrack(BaseTracker):
         if len(dets_second) > 0:
             """Detections"""
             detections_second = [
-                STrack(det_second, max_obs=self.max_obs, is_obb=self.is_obb)
-                for det_second in dets_second
+                STrack(det_second, max_obs=self.max_obs, is_obb=self.is_obb) for det_second in dets_second
             ]
         else:
             detections_second = []
-        r_tracked_stracks = [
-            strack_pool[i]
-            for i in u_track
-            if strack_pool[i].state == TrackState.Tracked
-        ]
+        r_tracked_stracks = [strack_pool[i] for i in u_track if strack_pool[i].state == TrackState.Tracked]
         dists = iou_distance(r_tracked_stracks, detections_second, is_obb=self.is_obb)
-        matches, u_track, u_detection_second = linear_assignment(dists, thresh=0.5)
+        matches, u_track, _u_detection_second = linear_assignment(dists, thresh=0.5)
         for itracked, idet in matches:
             track = r_tracked_stracks[itracked]
             det = detections_second[idet]
@@ -383,18 +365,14 @@ class ByteTrack(BaseTracker):
                 track.mark_removed()
                 removed_stracks.append(track)
 
-        self.active_tracks = [
-            t for t in self.active_tracks if t.state == TrackState.Tracked
-        ]
+        self.active_tracks = [t for t in self.active_tracks if t.state == TrackState.Tracked]
         self.active_tracks = joint_stracks(self.active_tracks, activated_starcks)
         self.active_tracks = joint_stracks(self.active_tracks, refind_stracks)
         self.lost_stracks = sub_stracks(self.lost_stracks, self.active_tracks)
         self.lost_stracks.extend(lost_stracks)
         self.lost_stracks = sub_stracks(self.lost_stracks, self.removed_stracks)
         self.removed_stracks.extend(removed_stracks)
-        self.active_tracks, self.lost_stracks = remove_duplicate_stracks(
-            self.active_tracks, self.lost_stracks
-        )
+        self.active_tracks, self.lost_stracks = remove_duplicate_stracks(self.active_tracks, self.lost_stracks)
         # get confs of lost tracks
         output_stracks = [track for track in self.active_tracks if track.is_activated]
         outputs = []
