@@ -46,7 +46,7 @@ at::Tensor dscn_cuda_forward(const at::Tensor &input, const at::Tensor &offset,
                "batch(%d) must divide im2col_step(%d)", batch, im2col_step_);
     AT_ASSERTM(
         channels == (group * group_channels),
-        "Input channels and group times group channels wont match: (%d vs %d).",
+        "Input channels and group times group channels won't match: (%d vs %d).",
         channels, group * group_channels);
 
     auto output =
@@ -113,7 +113,7 @@ dscn_cuda_backward(const at::Tensor &input, const at::Tensor &offset,
                "batch(%d) must divide im2col_step(%d)", batch, im2col_step_);
     AT_ASSERTM(
         channels == (group * group_channels),
-        "Input channels and group times group channels wont match: (%d vs %d).",
+        "Input channels and group times group channels won't match: (%d vs %d).",
         channels, group * group_channels);
 
     auto dtype = input.dtype();

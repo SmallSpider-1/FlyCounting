@@ -7,20 +7,10 @@ import numpy as np
 
 
 class BaseVisualization(ABC):
-    """
-    Abstract base class for visualization methods in BaseTracker.
-    """
-    
-    def id_to_color(
-        self,
-        id: int,
-        saturation: float = 0.75,
-        value: float = 0.95,
-        state: str = "confirmed"
-    ) -> tuple:
-        """
-        Returns green for target_id, otherwise generates a consistent unique BGR color using ID hashing.
-        """
+    """Abstract base class for visualization methods in BaseTracker."""
+
+    def id_to_color(self, id: int, saturation: float = 0.75, value: float = 0.95, state: str = "confirmed") -> tuple:
+        """Returns green for target_id, otherwise generates a consistent unique BGR color using ID hashing."""
         target_id = getattr(self, "target_id", None)
         if target_id is not None:
             return (0, 255, 0) if id == target_id else (0, 0, 0)
@@ -70,9 +60,7 @@ class BaseVisualization(ABC):
         state: str = "confirmed",
         style: str = "solid",  # "solid" | "dashed" (dashed only for AABB)
     ) -> np.ndarray:
-        """
-        Draws a bounding box with ID, confidence, and class information on an image.
-        """
+        """Draws a bounding box with ID, confidence, and class information on an image."""
         color = self.id_to_color(id, state=state)
         if self.is_obb:
             box_arr = np.asarray(box, dtype=np.float32).reshape(-1)
@@ -126,9 +114,7 @@ class BaseVisualization(ABC):
     def plot_trackers_trajectories(
         self, img: np.ndarray, observations: list, id: int, state: str = "confirmed"
     ) -> np.ndarray:
-        """
-        Draws the trajectories of tracked objects based on historical observations.
-        """
+        """Draws the trajectories of tracked objects based on historical observations."""
         for i, box in enumerate(observations):
             trajectory_thickness = int(np.sqrt(float(i + 1)) * 1.2)
             if self.is_obb:
@@ -181,6 +167,7 @@ class BaseVisualization(ABC):
         if hasattr(a, "state"):
             try:
                 from boxmot.trackers.bytetrack.basetrack import TrackState
+
                 if a.state == TrackState.Tracked:
                     return "confirmed"
                 elif a.state == TrackState.Lost:
@@ -250,9 +237,7 @@ class BaseVisualization(ABC):
         fontscale: float = 0.5,
         show_lost: bool = False,
     ) -> np.ndarray:
-        """
-        Visualizes the trajectories of all active tracks on the image.
-        """
+        """Visualizes the trajectories of all active tracks on the image."""
         for tracks, forced_state, style in self._display_groups():
             if not show_lost and forced_state in ("predicted", "removed"):
                 continue
@@ -276,9 +261,7 @@ class BaseVisualization(ABC):
 
 
 class ExplicitStateVisualization(BaseVisualization):
-    """
-    Visualization for trackers that maintain explicit lists for lost and removed tracks.
-    """
+    """Visualization for trackers that maintain explicit lists for lost and removed tracks."""
 
     def _display_groups(self):
         lost_list = getattr(self, "lost_stracks", None)
@@ -332,14 +315,12 @@ class ExplicitStateVisualization(BaseVisualization):
 
 
 class InferredStateVisualization(BaseVisualization):
-    """
-    Visualization for trackers that only expose active tracks and state is inferred.
-    """
+    """Visualization for trackers that only expose active tracks and state is inferred."""
 
     def _display_groups(self):
         # Maintain internal frame index for TTL accounting
         self._plot_frame_idx += 1
-        
+
         # Generic fallback: only active tracks; state per track
         active_tracks = self._all_active_tracks()
         if active_tracks:
@@ -347,14 +328,12 @@ class InferredStateVisualization(BaseVisualization):
 
 
 class VisualizationMixin(BaseVisualization):
-    """
-    Mixin class for visualization methods in BaseTracker.
-    """
-    
+    """Mixin class for visualization methods in BaseTracker."""
+
     def _display_groups(self):
         lost_list = getattr(self, "lost_stracks", None)
         removed_list = getattr(self, "removed_stracks", None)
-        
+
         if (lost_list is not None) or (removed_list is not None):
             return ExplicitStateVisualization._display_groups(self)
         else:

@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 import warnings
 from copy import deepcopy
-from typing import Optional
 
 import lap
 import numpy as np
@@ -42,15 +43,14 @@ def MhDist_similarity(mahalanobis_distance: np.ndarray, softmax_temp: float = 1.
     mahalanobis_distance = limit - mahalanobis_distance
 
     mahalanobis_distance = np.exp(mahalanobis_distance / softmax_temp) / np.exp(
-        mahalanobis_distance / softmax_temp).sum(0).reshape((1, -1))
+        mahalanobis_distance / softmax_temp
+    ).sum(0).reshape((1, -1))
     mahalanobis_distance = np.where(mask, 0, mahalanobis_distance)
     return mahalanobis_distance
 
 
 def iou_batch(bboxes1, bboxes2):
-    """
-    From SORT: Computes IOU between two bboxes in the form [x1,y1,x2,y2]
-    """
+    """From SORT: Computes IOU between two bboxes in the form [x1,y1,x2,y2]."""
     bboxes2 = np.expand_dims(bboxes2, 0)
     bboxes1 = np.expand_dims(bboxes1, 1)
 
@@ -61,20 +61,18 @@ def iou_batch(bboxes1, bboxes2):
     w = np.maximum(0.0, xx2 - xx1)
     h = np.maximum(0.0, yy2 - yy1)
     wh = w * h
-    return wh / ((bboxes1[..., 2] - bboxes1[..., 0]) * (bboxes1[..., 3] - bboxes1[..., 1])
-            + (bboxes2[..., 2] - bboxes2[..., 0]) * (bboxes2[..., 3] - bboxes2[..., 1])
-            - wh)
+    return wh / (
+        (bboxes1[..., 2] - bboxes1[..., 0]) * (bboxes1[..., 3] - bboxes1[..., 1])
+        + (bboxes2[..., 2] - bboxes2[..., 0]) * (bboxes2[..., 3] - bboxes2[..., 1])
+        - wh
+    )
 
 
 def soft_biou_batch(bboxes1, bboxes2):
+    """Computes soft BIoU between two bboxes in the form [x1,y1,x2,y2] BIoU is introduced in
+    https://arxiv.org/pdf/2211.14317 Soft BIoU is introduced as part of BoostTrack++ # Author : Vukasin Stanojevic #
+    Email : vukasin.stanojevic@pmf.edu.rs.
     """
-    Computes soft BIoU between two bboxes in the form [x1,y1,x2,y2]
-    BIoU is introduced in https://arxiv.org/pdf/2211.14317
-    Soft BIoU is introduced as part of BoostTrack++
-    # Author : Vukasin Stanojevic
-    # Email  : vukasin.stanojevic@pmf.edu.rs
-    """
-
     bboxes2 = np.expand_dims(bboxes2, 0)
     bboxes1 = np.expand_dims(bboxes1, 1)
     k1 = 0.25
@@ -120,7 +118,7 @@ def linear_assignment(
     iou_matrix: np.ndarray,
     cost_matrix: np.ndarray,
     threshold: float,
-    emb_cost: Optional[np.ndarray] = None,
+    emb_cost: np.ndarray | None = None,
 ):
     if iou_matrix is None and cost_matrix is None:
         raise Exception("Both iou_matrix and cost_matrix are None!")
@@ -142,7 +140,8 @@ def linear_assignment(
     matches = []
     for m in matched_indices:
         valid_match = iou_matrix[m[0], m[1]] >= threshold or (
-            False if emb_cost is None else (iou_matrix[m[0], m[1]] >= threshold / 2 and emb_cost[m[0], m[1]] >= 0.75))
+            False if emb_cost is None else (iou_matrix[m[0], m[1]] >= threshold / 2 and emb_cost[m[0], m[1]] >= 0.75)
+        )
         if valid_match:
             matches.append(m.reshape(1, 2))
         else:
@@ -154,17 +153,17 @@ def linear_assignment(
 
 
 def associate(
-        detections,
-        trackers,
-        iou_threshold,
-        mahalanobis_distance: Optional[np.ndarray] = None,
-        track_confidence: Optional[np.ndarray] = None,
-        detection_confidence: Optional[np.ndarray] = None,
-        emb_cost: Optional[np.ndarray] = None,
-        lambda_iou: float = 0.5,
-        lambda_mhd: float = 0.25,
-        lambda_shape: float = 0.25,
-        s_sim_corr: bool = False,
+    detections,
+    trackers,
+    iou_threshold,
+    mahalanobis_distance: np.ndarray | None = None,
+    track_confidence: np.ndarray | None = None,
+    detection_confidence: np.ndarray | None = None,
+    emb_cost: np.ndarray | None = None,
+    lambda_iou: float = 0.5,
+    lambda_mhd: float = 0.25,
+    lambda_shape: float = 0.25,
+    s_sim_corr: bool = False,
 ):
     if len(trackers) == 0:
         return (

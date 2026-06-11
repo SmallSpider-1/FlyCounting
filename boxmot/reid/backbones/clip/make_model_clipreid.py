@@ -56,7 +56,7 @@ class TextEncoder(nn.Module):
 
 class build_transformer(nn.Module):
     def __init__(self, num_classes, camera_num, view_num, cfg):
-        super(build_transformer, self).__init__()
+        super().__init__()
         self.model_name = cfg.MODEL.NAME
         self.cos_layer = cfg.MODEL.COS_LAYER
         self.neck = cfg.MODEL.NECK
@@ -74,9 +74,7 @@ class build_transformer(nn.Module):
 
         self.classifier = nn.Linear(self.in_planes, self.num_classes, bias=False)
         self.classifier.apply(weights_init_classifier)
-        self.classifier_proj = nn.Linear(
-            self.in_planes_proj, self.num_classes, bias=False
-        )
+        self.classifier_proj = nn.Linear(self.in_planes_proj, self.num_classes, bias=False)
         self.classifier_proj.apply(weights_init_classifier)
 
         self.bottleneck = nn.BatchNorm1d(self.in_planes)
@@ -112,9 +110,7 @@ class build_transformer(nn.Module):
         #     print('camera number is : {}'.format(view_num))
 
         dataset_name = cfg.DATASETS.NAMES
-        self.prompt_learner = PromptLearner(
-            num_classes, dataset_name, clip_model.dtype, clip_model.token_embedding
-        )
+        self.prompt_learner = PromptLearner(num_classes, dataset_name, clip_model.dtype, clip_model.token_embedding)
         self.text_encoder = TextEncoder(clip_model)
 
     def forward(
@@ -128,9 +124,7 @@ class build_transformer(nn.Module):
     ):
         if get_text is True:
             prompts = self.prompt_learner(label)
-            text_features = self.text_encoder(
-                prompts, self.prompt_learner.tokenized_prompts
-            )
+            text_features = self.text_encoder(prompts, self.prompt_learner.tokenized_prompts)
             return text_features
 
         if get_image is True:
@@ -141,22 +135,16 @@ class build_transformer(nn.Module):
                 return image_features_proj[:, 0]
 
         if self.model_name == "RN50":
-            image_features_last, image_features, image_features_proj = (
-                self.image_encoder(x)
+            image_features_last, image_features, image_features_proj = self.image_encoder(x)
+            img_feature_last = nn.functional.avg_pool2d(image_features_last, image_features_last.shape[2:4]).view(
+                x.shape[0], -1
             )
-            img_feature_last = nn.functional.avg_pool2d(
-                image_features_last, image_features_last.shape[2:4]
-            ).view(x.shape[0], -1)
-            img_feature = nn.functional.avg_pool2d(
-                image_features, image_features.shape[2:4]
-            ).view(x.shape[0], -1)
+            img_feature = nn.functional.avg_pool2d(image_features, image_features.shape[2:4]).view(x.shape[0], -1)
             img_feature_proj = image_features_proj[0]
 
         elif self.model_name == "ViT-B-16":
             if cam_label is not None and view_label is not None:
-                cv_embed = (
-                    self.sie_coe * self.cv_embed[cam_label * self.view_num + view_label]
-                )
+                cv_embed = self.sie_coe * self.cv_embed[cam_label * self.view_num + view_label]
             elif cam_label is not None:
                 cv_embed = self.sie_coe * self.cv_embed[cam_label]
             elif view_label is not None:
@@ -191,13 +179,13 @@ class build_transformer(nn.Module):
         param_dict = torch.load(trained_path)
         for i in param_dict:
             self.state_dict()[i.replace("module.", "")].copy_(param_dict[i])
-        print("Loaded pretrained model from {}".format(trained_path))
+        print(f"Loaded pretrained model from {trained_path}")
 
     def load_param_finetune(self, model_path):
         param_dict = torch.load(model_path)
         for i in param_dict:
             self.state_dict()[i].copy_(param_dict[i])
-        print("Loading pretrained model for finetuning from {}".format(model_path))
+        print(f"Loading pretrained model for finetuning from {model_path}")
 
 
 def make_model(cfg, num_class, camera_num, view_num):
@@ -220,9 +208,7 @@ def load_clip_to_cpu(backbone_name, h_resolution, w_resolution, vision_stride_si
     except RuntimeError:
         state_dict = torch.load(model_path, map_location="cpu")
 
-    model = clip.build_model(
-        state_dict or model.state_dict(), h_resolution, w_resolution, vision_stride_size
-    )
+    model = clip.build_model(state_dict or model.state_dict(), h_resolution, w_resolution, vision_stride_size)
 
     return model
 

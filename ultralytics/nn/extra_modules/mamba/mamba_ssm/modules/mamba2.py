@@ -5,7 +5,6 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from einops import rearrange, repeat
 
 try:
@@ -18,13 +17,10 @@ try:
 except ImportError:
     selective_state_update = None
 
-from mamba_ssm.ops.triton.layernorm_gated import RMSNorm as RMSNormGated
-
-from mamba_ssm.distributed.tensor_parallel import ColumnParallelLinear, RowParallelLinear
 from mamba_ssm.distributed.distributed_utils import all_reduce, reduce_scatter
-
-from mamba_ssm.ops.triton.ssd_combined import mamba_chunk_scan_combined
-from mamba_ssm.ops.triton.ssd_combined import mamba_split_conv1d_scan_combined
+from mamba_ssm.distributed.tensor_parallel import ColumnParallelLinear, RowParallelLinear
+from mamba_ssm.ops.triton.layernorm_gated import RMSNorm as RMSNormGated
+from mamba_ssm.ops.triton.ssd_combined import mamba_chunk_scan_combined, mamba_split_conv1d_scan_combined
 
 
 class Mamba2(nn.Module):
@@ -90,9 +86,14 @@ class Mamba2(nn.Module):
         if self.process_group is None:
             self.in_proj = nn.Linear(self.d_model, d_in_proj, bias=bias, **factory_kwargs)
         else:
-            self.in_proj = ColumnParallelLinear(self.d_model, d_in_proj * self.world_size, bias=bias,
-                                                process_group=self.process_group, sequence_parallel=self.sequence_parallel,
-                                                **factory_kwargs)
+            self.in_proj = ColumnParallelLinear(
+                self.d_model,
+                d_in_proj * self.world_size,
+                bias=bias,
+                process_group=self.process_group,
+                sequence_parallel=self.sequence_parallel,
+                **factory_kwargs,
+            )
 
         conv_dim = self.d_ssm + 2 * self.ngroups * self.d_state
         self.conv1d = nn.Conv1d(
@@ -111,8 +112,7 @@ class Mamba2(nn.Module):
 
         # Initialize log dt bias
         dt = torch.exp(
-            torch.rand(self.nheads, **factory_kwargs) * (math.log(dt_max) - math.log(dt_min))
-            + math.log(dt_min)
+            torch.rand(self.nheads, **factory_kwargs) * (math.log(dt_max) - math.log(dt_min)) + math.log(dt_min)
         )
         dt = torch.clamp(dt, min=dt_init_floor)
         # Inverse of softplus: https://github.com/pytorch/pytorch/issues/72759
@@ -134,29 +134,36 @@ class Mamba2(nn.Module):
 
         if self.rmsnorm:
             assert RMSNormGated is not None
-            self.norm = RMSNormGated(self.d_ssm, eps=1e-5, norm_before_gate=self.norm_before_gate,
-                                     group_size=self.d_ssm // ngroups, **factory_kwargs)
+            self.norm = RMSNormGated(
+                self.d_ssm,
+                eps=1e-5,
+                norm_before_gate=self.norm_before_gate,
+                group_size=self.d_ssm // ngroups,
+                **factory_kwargs,
+            )
 
         if self.process_group is None:
             self.out_proj = nn.Linear(self.d_inner, self.d_model, bias=bias, **factory_kwargs)
         else:
-            self.out_proj = RowParallelLinear(self.d_inner * self.world_size, self.d_model, bias=bias,
-                                              process_group=self.process_group, sequence_parallel=self.sequence_parallel,
-                                              **factory_kwargs)
+            self.out_proj = RowParallelLinear(
+                self.d_inner * self.world_size,
+                self.d_model,
+                bias=bias,
+                process_group=self.process_group,
+                sequence_parallel=self.sequence_parallel,
+                **factory_kwargs,
+            )
 
     def forward(self, u, seqlen=None, seq_idx=None, inference_params=None):
-        """
-        u: (batch, seqlen, hidden_dim) if seqlen=None.
-            If seqlen is not None, u is (batch * seqlen, hidden_dim). This is so that when we
-            split u during sequence parallel, we split the batch * seqlen dimension
-            (in case batch is small).
-        Returns: same shape as u
+        """u: (batch, seqlen, hidden_dim) if seqlen=None. If seqlen is not None, u is (batch * seqlen, hidden_dim). This
+        is so that when we split u during sequence parallel, we split the batch * seqlen dimension (in case
+        batch is small). Returns: same shape as u.
         """
         seqlen_og = seqlen
         if seqlen is None:
             batch, seqlen, dim = u.shape
         else:
-            batch_seqlen, dim = u.shape
+            batch_seqlen, _dim = u.shape
             batch = batch_seqlen // seqlen
 
         conv_state, ssm_state = None, None
@@ -200,9 +207,7 @@ class Mamba2(nn.Module):
         else:
             d_mlp = (zxbcdt.shape[-1] - 2 * self.d_ssm - 2 * self.ngroups * self.d_state - self.nheads) // 2
             z0, x0, z, xBC, dt = torch.split(
-                zxbcdt,
-                [d_mlp, d_mlp, self.d_ssm, self.d_ssm + 2 * self.ngroups * self.d_state, self.nheads],
-                dim=-1
+                zxbcdt, [d_mlp, d_mlp, self.d_ssm, self.d_ssm + 2 * self.ngroups * self.d_state, self.nheads], dim=-1
             )
             if conv_state is not None:
                 # If we just take xBC[:, :, -self.d_conv :], it will error if seqlen < self.d_conv
@@ -256,9 +261,7 @@ class Mamba2(nn.Module):
         zxbcdt = self.in_proj(hidden_states.squeeze(1))  # (B 2D)
         d_mlp = (zxbcdt.shape[-1] - 2 * self.d_ssm - 2 * self.ngroups * self.d_state - self.nheads) // 2
         z0, x0, z, xBC, dt = torch.split(
-            zxbcdt,
-            [d_mlp, d_mlp, self.d_ssm, self.d_ssm + 2 * self.ngroups * self.d_state, self.nheads],
-            dim=-1
+            zxbcdt, [d_mlp, d_mlp, self.d_ssm, self.d_ssm + 2 * self.ngroups * self.d_state, self.nheads], dim=-1
         )
 
         # Conv step
@@ -306,8 +309,16 @@ class Mamba2(nn.Module):
             if not self.rmsnorm:
                 z = rearrange(z, "b (h p) -> b h p", p=self.headdim)
             y = selective_state_update(
-                ssm_state, x_reshaped, dt, A, B, C, D, z=z if not self.rmsnorm else None,
-                dt_bias=dt_bias, dt_softplus=True
+                ssm_state,
+                x_reshaped,
+                dt,
+                A,
+                B,
+                C,
+                D,
+                z=z if not self.rmsnorm else None,
+                dt_bias=dt_bias,
+                dt_softplus=True,
             )
             y = rearrange(y, "b h p -> b (h p)")
         if self.rmsnorm:
@@ -320,19 +331,14 @@ class Mamba2(nn.Module):
     def allocate_inference_cache(self, batch_size, max_seqlen, dtype=None, **kwargs):
         device = self.out_proj.weight.device
         conv_dtype = self.conv1d.weight.dtype if dtype is None else dtype
-        conv_state = torch.zeros(
-            batch_size, self.conv1d.weight.shape[0], self.d_conv, device=device, dtype=conv_dtype
-        )
+        conv_state = torch.zeros(batch_size, self.conv1d.weight.shape[0], self.d_conv, device=device, dtype=conv_dtype)
         ssm_dtype = self.in_proj.weight.dtype if dtype is None else dtype
-        ssm_state = torch.zeros(
-            batch_size, self.nheads, self.headdim, self.d_state, device=device, dtype=ssm_dtype
-        )
+        ssm_state = torch.zeros(batch_size, self.nheads, self.headdim, self.d_state, device=device, dtype=ssm_dtype)
         return conv_state, ssm_state
 
     def _get_states_from_cache(self, inference_params, batch_size, initialize_states=False):
         assert self.layer_idx is not None
         if self.layer_idx not in inference_params.key_value_memory_dict:
-            batch_shape = (batch_size,)
             conv_state = torch.zeros(
                 batch_size,
                 self.conv1d.weight.shape[0],

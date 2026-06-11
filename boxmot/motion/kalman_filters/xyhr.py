@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 from copy import deepcopy
-from typing import Optional, Tuple
 
 import numpy as np
 import scipy.linalg
@@ -34,21 +35,20 @@ class ConstantNoiseXYHR:
 
 
 class KalmanFilterXYHR(BaseKalmanFilter):
-    """
-    Constant-noise Kalman filter for XYHR with optional OBB extension.
+    """Constant-noise Kalman filter for XYHR with optional OBB extension.
 
     - `dim_z=4, dim_x=8`: [x, y, h, r, vx, vy, vh, vr]
     - `dim_z=5, dim_x=10`: [x, y, h, r, theta, vx, vy, vh, vr, vtheta]
 
-    This preserves BoostTrack's original constant-noise model while exposing
-    the filter under the shared `boxmot.motion.kalman_filters` namespace.
+    This preserves BoostTrack's original constant-noise model while exposing the filter under the shared
+    `boxmot.motion.kalman_filters` namespace.
     """
 
     def __init__(
         self,
-        z: Optional[np.ndarray] = None,
+        z: np.ndarray | None = None,
         ndim: int = 8,
-        dim_z: Optional[int] = None,
+        dim_z: int | None = None,
         dt: float = 1.0,
         track_id: int = -1,
     ):
@@ -109,9 +109,7 @@ class KalmanFilterXYHR(BaseKalmanFilter):
         else:
             measurement = measurement.reshape(-1)
         if measurement.size < self.dim_z:
-            raise ValueError(
-                f"measurement must have at least {self.dim_z} values, got {measurement.size}"
-            )
+            raise ValueError(f"measurement must have at least {self.dim_z} values, got {measurement.size}")
         measurement = measurement[: self.dim_z]
         measurement[2] = max(float(measurement[2]), 1e-4)
         measurement[3] = max(float(measurement[3]), 1e-4)
@@ -132,7 +130,7 @@ class KalmanFilterXYHR(BaseKalmanFilter):
         del measurement
         return np.sqrt(np.diag(self.cov_update_policy.get_init_state_cov()))
 
-    def _get_process_noise_std(self, mean: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def _get_process_noise_std(self, mean: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         del mean
         q_diag = np.sqrt(np.diag(self.cov_update_policy.get_q()))
         velocity_dims = min(self.dim_z, max(0, self.dim_x - self.dim_z))
@@ -140,15 +138,11 @@ class KalmanFilterXYHR(BaseKalmanFilter):
         std_vel = q_diag[self.dim_z : self.dim_z + velocity_dims]
         return std_pos, std_vel
 
-    def _get_measurement_noise_std(
-        self, mean: np.ndarray, confidence: float
-    ) -> np.ndarray:
+    def _get_measurement_noise_std(self, mean: np.ndarray, confidence: float) -> np.ndarray:
         del mean, confidence
         return np.sqrt(np.diag(self.cov_update_policy.get_r()))
 
-    def _get_multi_process_noise_std(
-        self, mean: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    def _get_multi_process_noise_std(self, mean: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         if mean.ndim != 2:
             raise ValueError("Expected mean to have shape (n, dim_x)")
         n = mean.shape[0]
@@ -157,7 +151,7 @@ class KalmanFilterXYHR(BaseKalmanFilter):
         std_vel_multi = [np.full(n, float(v), dtype=float) for v in std_vel]
         return std_pos_multi, std_vel_multi
 
-    def initiate(self, measurement: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def initiate(self, measurement: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         mean = np.zeros((self.dim_x,), dtype=float)
         mean[: self.dim_z] = self._reshape_measurement_vector(measurement)
         covariance = self.cov_update_policy.get_init_state_cov()
@@ -167,9 +161,9 @@ class KalmanFilterXYHR(BaseKalmanFilter):
 
     def predict(
         self,
-        mean: Optional[np.ndarray] = None,
-        covariance: Optional[np.ndarray] = None,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+        mean: np.ndarray | None = None,
+        covariance: np.ndarray | None = None,
+    ) -> tuple[np.ndarray, np.ndarray]:
         update = mean is None
         if mean is None:
             mean = self.x
@@ -179,10 +173,7 @@ class KalmanFilterXYHR(BaseKalmanFilter):
 
         motion_cov = self.cov_update_policy.get_q()
         mean = np.dot(self._motion_mat, mean)
-        covariance = (
-            np.linalg.multi_dot((self._motion_mat, covariance, self._motion_mat.T))
-            + motion_cov
-        )
+        covariance = np.linalg.multi_dot((self._motion_mat, covariance, self._motion_mat.T)) + motion_cov
 
         if update:
             self.x = mean
@@ -192,9 +183,9 @@ class KalmanFilterXYHR(BaseKalmanFilter):
 
     def project(
         self,
-        mean: Optional[np.ndarray] = None,
-        covariance: Optional[np.ndarray] = None,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+        mean: np.ndarray | None = None,
+        covariance: np.ndarray | None = None,
+    ) -> tuple[np.ndarray, np.ndarray]:
         if mean is None:
             mean = self.x
             covariance = self.covariance
@@ -203,23 +194,17 @@ class KalmanFilterXYHR(BaseKalmanFilter):
 
         innovation_cov = self.cov_update_policy.get_r()
         projected_mean = np.dot(self._update_mat, mean)
-        projected_cov = np.linalg.multi_dot(
-            (self._update_mat, covariance, self._update_mat.T)
-        )
+        projected_cov = np.linalg.multi_dot((self._update_mat, covariance, self._update_mat.T))
         return projected_mean, projected_cov + innovation_cov
 
-    def update(self, z: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def update(self, z: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         measurement = self._reshape_measurement_vector(z)
         if self._is_obb:
             reference_theta = float(self.x[4])
-            measurement[4] = self._align_angle_to_reference(
-                measurement[4], reference_theta
-            )
+            measurement[4] = self._align_angle_to_reference(measurement[4], reference_theta)
         projected_mean, projected_cov = self.project()
 
-        chol_factor, lower = scipy.linalg.cho_factor(
-            projected_cov, lower=True, check_finite=False
-        )
+        chol_factor, lower = scipy.linalg.cho_factor(projected_cov, lower=True, check_finite=False)
         kalman_gain = scipy.linalg.cho_solve(
             (chol_factor, lower),
             np.dot(self.covariance, self._update_mat.T).T,
@@ -228,9 +213,7 @@ class KalmanFilterXYHR(BaseKalmanFilter):
 
         innovation = measurement - projected_mean
         self.x = self.x + np.dot(innovation, kalman_gain.T)
-        self.covariance = self.covariance - np.linalg.multi_dot(
-            (kalman_gain, projected_cov, kalman_gain.T)
-        )
+        self.covariance = self.covariance - np.linalg.multi_dot((kalman_gain, projected_cov, kalman_gain.T))
         self._enforce_state_constraints()
 
         return self.x, self.covariance

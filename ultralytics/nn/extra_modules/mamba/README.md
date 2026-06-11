@@ -1,13 +1,15 @@
 # Mamba
 
 ![Mamba](assets/selection.png "Selective State Space")
+
 > **Mamba: Linear-Time Sequence Modeling with Selective State Spaces**\
 > Albert Gu*, Tri Dao*\
 > Paper: https://arxiv.org/abs/2312.00752
 
 ![Mamba-2](assets/ssd_algorithm.png "State Space Dual Model")
+
 > **Transformers are SSMs: Generalized Models and Efficient Algorithms**\
->     **Through Structured State Space Duality**\
+>  **Through Structured State Space Duality**\
 > Tri Dao*, Albert Gu*\
 > Paper: https://arxiv.org/abs/2405.21060
 
@@ -27,6 +29,7 @@ It can also be built from source with `pip install .` from this repository.
 If `pip` complains about PyTorch versions, try passing `--no-build-isolation` to `pip`.
 
 Other requirements:
+
 - Linux
 - NVIDIA GPU
 - PyTorch 1.12+
@@ -49,7 +52,8 @@ The main module of this repository is the Mamba architecture block wrapping the 
 Source: [modules/mamba_simple.py](mamba_ssm/modules/mamba_simple.py).
 
 Usage:
-``` python
+
+```python
 import torch
 from mamba_ssm import Mamba
 
@@ -73,7 +77,8 @@ The Mamba-2 block is implemented at [modules/mamba2.py](mamba_ssm/modules/mamba2
 A simpler version is at [modules/mamba2_simple.py](mamba_ssm/modules/mamba2_simple.py)
 
 The usage is similar to Mamba(-1):
-``` python
+
+```python
 from mamba_ssm import Mamba2
 model = Mamba2(
     # This module uses roughly 3 * expand * d_model^2 parameters
@@ -100,7 +105,6 @@ Source: [models/mixer_seq_simple.py](mamba_ssm/models/mixer_seq_simple.py).
 This is an example of how to integrate Mamba into an end-to-end neural network.
 This example is used in the generation scripts below.
 
-
 ## Pretrained Models
 
 Pretrained models are uploaded to
@@ -109,13 +113,12 @@ Pretrained models are uploaded to
 `mamba2-780m`, `mamba2-1.3b`, `mamba2-2.7b`, `transformerpp-2.7b`, `mamba2attn-2.7b`, trained on 300B tokens on the Pile, as well as `mamba-2.8b-slimpj`
 (trained on 600B tokens on the SlimPajama dataset).
 
-
 The models will be autodownloaded by the generation script below.
 
 These models were trained on the [Pile](https://huggingface.co/datasets/EleutherAI/pile), and follow the standard model dimensions described by GPT-3 and followed by many open source models:
 
-| Parameters | Layers | Model dim. | 
-|------------|--------|------------|
+| Parameters | Layers | Model dim. |
+| ---------- | ------ | ---------- |
 | 130M       | 24     | 768        |
 | 370M       | 48     | 1024       |
 | 790M       | 48     | 1536       |
@@ -127,7 +130,6 @@ These models were trained on the [Pile](https://huggingface.co/datasets/Eleuther
 Note: these are base models trained only for 300B tokens, without any form of downstream modification (instruction tuning, etc.).
 Performance is expected to be comparable or better than other architectures trained on similar data, but not to match larger or fine-tuned models.
 
-
 ## Evaluations
 
 To run zero-shot evaluations of models (corresponding to Table 3 of the paper),
@@ -137,19 +139,22 @@ library.
 
 1. Install `lm-evaluation-harness` by `pip install lm-eval==0.4.2`.
 2. Run evaluation with (more documentation at the [lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness/tree/big-refactor) repo):
-``` sh
+
+```sh
 lm_eval --model mamba_ssm --model_args pretrained=state-spaces/mamba-130m --tasks lambada_openai,hellaswag,piqa,arc_easy,arc_challenge,winogrande,openbookqa --device cuda --batch_size 256
 python evals/lm_harness_eval.py --model hf --model_args pretrained=EleutherAI/pythia-160m --tasks lambada_openai,hellaswag,piqa,arc_easy,arc_challenge,winogrande --device cuda --batch_size 64
 ```
 
 To reproduce the results on the `mamba-2.8b-slimpj` model reported in the blogposts:
-``` sh
+
+```sh
 lm_eval --model mamba_ssm --model_args pretrained=state-spaces/mamba-2.8b-slimpj --tasks boolq,piqa,hellaswag,winogrande,arc_easy,arc_challenge,openbookqa,race,truthfulqa_mc2 --device cuda --batch_size 256
 lm_eval --model mamba_ssm --model_args pretrained=state-spaces/mamba-2.8b-slimpj --tasks mmlu --num_fewshot 5 --device cuda --batch_size 256
 ```
 
 To run evaluations on Mamba-2 models, simply replace the model names:
-``` sh
+
+```sh
 lm_eval --model mamba_ssm --model_args pretrained=state-spaces/mamba2-2.7b --tasks lambada_openai,hellaswag,piqa,arc_easy,arc_challenge,winogrande,openbookqa --device cuda --batch_size 256
 lm_eval --model mamba_ssm --model_args pretrained=state-spaces/transformerpp-2.7b --tasks lambada_openai,hellaswag,piqa,arc_easy,arc_challenge,winogrande,openbookqa --device cuda --batch_size 256
 lm_eval --model mamba_ssm --model_args pretrained=state-spaces/mamba2attn-2.7b --tasks lambada_openai,hellaswag,piqa,arc_easy,arc_challenge,winogrande,openbookqa --device cuda --batch_size 256
@@ -160,6 +165,7 @@ Note that the result of each task might differ from reported values by 0.1-0.3 d
 ## Inference
 
 The script [benchmarks/benchmark_generation_mamba_simple.py](benchmarks/benchmark_generation_mamba_simple.py)
+
 1. autoloads a model from the Hugging Face Hub,
 2. generates completions of a user-specified prompt,
 3. benchmarks the inference speed of this generation.
@@ -170,27 +176,29 @@ Other configurable options include the top-p (nucleus sampling) probability, and
 
 To test generation latency (e.g. batch size = 1) with different sampling strategies:
 
-``` sh
+```sh
 python benchmarks/benchmark_generation_mamba_simple.py --model-name "state-spaces/mamba-2.8b" --prompt "My cat wrote all this CUDA code for a new language model and" --topp 0.9 --temperature 0.7 --repetition-penalty 1.2
 python benchmarks/benchmark_generation_mamba_simple.py --model-name "EleutherAI/pythia-2.8b" --prompt "My cat wrote all this CUDA code for a new language model and" --topp 0.9 --temperature 0.7 --repetition-penalty 1.2
 python benchmarks/benchmark_generation_mamba_simple.py --model-name "state-spaces/mamba-2.8b" --prompt "My cat wrote all this CUDA code for a new language model and" --minp 0.05 --topk 0 --temperature 0.7 --repetition-penalty 1.2
 ```
 
 To test generation throughput with random prompts (e.g. large batch size):
-``` sh
+
+```sh
 python benchmarks/benchmark_generation_mamba_simple.py --model-name "state-spaces/mamba-2.8b" --batch 64
 python benchmarks/benchmark_generation_mamba_simple.py --model-name "EleutherAI/pythia-2.8b" --batch 64
 ```
 
 With Mamba-2, you just need to change the model name:
-``` sh
+
+```sh
 python benchmarks/benchmark_generation_mamba_simple.py --model-name "state-spaces/mamba2-2.7b" --prompt "My cat wrote all this CUDA code for a new language model and" --topp 0.9 --temperature 0.7 --repetition-penalty 1.2
 ```
-
 
 ## Troubleshooting
 
 ### Precision
+
 Our models were trained using PyTorch [AMP](https://pytorch.org/docs/stable/amp.html) for mixed precision. AMP keeps model parameters in float32 and casts to half precision when necessary.
 On the other hand, other frameworks like DeepSpeed store parameters in float16 and upcasts when necessary (e.g. for optimizer accumulation).
 
@@ -198,16 +206,17 @@ We've observed that higher precision for the main model parameters may be necess
 as a first step please try a framework storing parameters in fp32 (such as AMP).
 
 ### Initialization
+
 Some parts of the model have initializations inherited from prior work on S4 models.
 For [example](https://github.com/state-spaces/mamba/blob/f0affcf69f06d1d06cef018ff640bf080a11c421/mamba_ssm/modules/mamba_simple.py#L102), the $\Delta$ parameter has a targeted range by initializing the bias of its linear projection.
 However, some frameworks may have post-initialization hooks (e.g. setting all bias terms in `nn.Linear` modules to zero).
 If this is the case, you may have to add custom logic (e.g. this [line](https://github.com/state-spaces/mamba/blob/f0affcf69f06d1d06cef018ff640bf080a11c421/mamba_ssm/modules/mamba_simple.py#L104) turns off re-initializing in our trainer, but would be a no-op in any other framework)
 that is specific to the training framework.
 
-
 ## Citation
 
 If you use this codebase, or otherwise find our work valuable, please cite Mamba:
+
 ```
 @article{mamba,
   title={Mamba: Linear-Time Sequence Modeling with Selective State Spaces},

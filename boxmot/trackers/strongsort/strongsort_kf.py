@@ -20,21 +20,17 @@ chi2inv95 = {
 }
 
 
-class KalmanFilter(object):
-    """
-    A simple Kalman filter for tracking bounding boxes in image space.
+class KalmanFilter:
+    """A simple Kalman filter for tracking bounding boxes in image space.
 
     The 8-dimensional state space
 
         x, y, a, h, vx, vy, va, vh
 
-    contains the bounding box center position (x, y), aspect ratio a, height h,
-    and their respective velocities.
+    contains the bounding box center position (x, y), aspect ratio a, height h, and their respective velocities.
 
-    Object motion follows a constant velocity model. The bounding box location
-    (x, y, a, h) is taken as direct observation of the state space (linear
-    observation model).
-
+    Object motion follows a constant velocity model. The bounding box location (x, y, a, h) is taken as direct
+    observation of the state space (linear observation model).
     """
 
     def __init__(self):
@@ -62,13 +58,10 @@ class KalmanFilter(object):
             Bounding box coordinates (x, y, a, h) with center position (x, y),
             aspect ratio a, and height h.
 
-        Returns
-        -------
-        (ndarray, ndarray)
-            Returns the mean vector (8 dimensional) and covariance matrix (8x8
+        Returns:
+            -------: (ndarray, ndarray) Returns the mean vector (8 dimensional) and covariance matrix (8x8
             dimensional) of the new track. Unobserved velocities are initialized
             to 0 mean.
-
         """
         mean_pos = measurement
         mean_vel = np.zeros_like(mean_pos)
@@ -99,12 +92,9 @@ class KalmanFilter(object):
             The 8x8 dimensional covariance matrix of the object state at the
             previous time step.
 
-        Returns
-        -------
-        (ndarray, ndarray)
-            Returns the mean vector and covariance matrix of the predicted
+        Returns:
+            -------: (ndarray, ndarray) Returns the mean vector and covariance matrix of the predicted
             state. Unobserved velocities are initialized to 0 mean.
-
         """
         std_pos = [
             self._std_weight_position * mean[3],
@@ -121,8 +111,7 @@ class KalmanFilter(object):
         motion_cov = np.diag(np.square(np.r_[std_pos, std_vel]))
 
         mean = np.dot(self._motion_mat, mean)
-        covariance = np.linalg.multi_dot((
-            self._motion_mat, covariance, self._motion_mat.T)) + motion_cov
+        covariance = np.linalg.multi_dot((self._motion_mat, covariance, self._motion_mat.T)) + motion_cov
 
         return mean, covariance
 
@@ -136,12 +125,9 @@ class KalmanFilter(object):
         covariance : ndarray
             The state's covariance matrix (8x8 dimensional).
         confidence: (dyh) 检测框置信度
-        Returns
-        -------
-        (ndarray, ndarray)
-            Returns the projected mean and covariance matrix of the given state
-            estimate.
 
+        Returns:
+            -------: (ndarray, ndarray) Returns the projected mean and covariance matrix of the given state estimate.
         """
         std = [
             self._std_weight_position * mean[3],
@@ -155,9 +141,7 @@ class KalmanFilter(object):
         innovation_cov = np.diag(np.square(std))
 
         mean = np.dot(self._update_mat, mean)
-        covariance = np.linalg.multi_dot(
-            (self._update_mat, covariance, self._update_mat.T)
-        )
+        covariance = np.linalg.multi_dot((self._update_mat, covariance, self._update_mat.T))
         return mean, covariance + innovation_cov
 
     def update(self, mean, covariance, measurement, confidence=0.0):
@@ -174,17 +158,13 @@ class KalmanFilter(object):
             is the center position, a the aspect ratio, and h the height of the
             bounding box.
         confidence: (dyh)检测框置信度
-        Returns
-        -------
-        (ndarray, ndarray)
-            Returns the measurement-corrected state distribution.
 
+        Returns:
+            -------: (ndarray, ndarray) Returns the measurement-corrected state distribution.
         """
         projected_mean, projected_cov = self.project(mean, covariance, confidence)
 
-        chol_factor, lower = scipy.linalg.cho_factor(
-            projected_cov, lower=True, check_finite=False
-        )
+        chol_factor, lower = scipy.linalg.cho_factor(projected_cov, lower=True, check_finite=False)
         kalman_gain = scipy.linalg.cho_solve(
             (chol_factor, lower),
             np.dot(covariance, self._update_mat.T).T,
@@ -193,9 +173,7 @@ class KalmanFilter(object):
         innovation = measurement - projected_mean
 
         new_mean = mean + np.dot(innovation, kalman_gain.T)
-        new_covariance = covariance - np.linalg.multi_dot(
-            (kalman_gain, projected_cov, kalman_gain.T)
-        )
+        new_covariance = covariance - np.linalg.multi_dot((kalman_gain, projected_cov, kalman_gain.T))
         return new_mean, new_covariance
 
     def gating_distance(self, mean, covariance, measurements, only_position=False):
@@ -219,13 +197,9 @@ class KalmanFilter(object):
             If True, distance computation is done with respect to the bounding
             box center position only.
 
-        Returns
-        -------
-        ndarray
-            Returns an array of length N, where the i-th element contains the
-            squared Mahalanobis distance between (mean, covariance) and
-            `measurements[i]`.
-
+        Returns:
+            -------: ndarray Returns an array of length N, where the i-th element contains the squared Mahalanobis
+                distance between (mean, covariance) and `measurements[i]`.
         """
         mean, covariance = self.project(mean, covariance)
 
@@ -235,8 +209,6 @@ class KalmanFilter(object):
 
         cholesky_factor = np.linalg.cholesky(covariance)
         d = measurements - mean
-        z = scipy.linalg.solve_triangular(
-            cholesky_factor, d.T, lower=True, check_finite=False, overwrite_b=True
-        )
+        z = scipy.linalg.solve_triangular(cholesky_factor, d.T, lower=True, check_finite=False, overwrite_b=True)
         squared_maha = np.sum(z * z, axis=0)
         return squared_maha
