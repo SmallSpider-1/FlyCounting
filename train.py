@@ -1,14 +1,14 @@
 import argparse
-import csv
 import contextlib
+import csv
 import os
 import sys
 import traceback
+import warnings
 from datetime import datetime
 from pathlib import Path
 
-import warnings
-warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore")
 
 
 ROOT = Path(__file__).resolve().parent
@@ -159,7 +159,13 @@ def train_one(model_name, args):
     project = get_project_path(model_name, args.data)
     if not args.force and has_completed_weights(project):
         print(f"跳过已完成模型: {model_name} ({project})")
-        return {"model": model_name, "status": "skipped", "log_path": "", "project": str(project), "message": "completed weights found"}
+        return {
+            "model": model_name,
+            "status": "skipped",
+            "log_path": "",
+            "project": str(project),
+            "message": "completed weights found",
+        }
 
     log_path = get_log_path(project)
     from ultralytics import YOLO
@@ -176,22 +182,29 @@ def train_one(model_name, args):
             previous_logger_streams = set_ultralytics_logger_stream(stdout_tee)
             try:
                 model = YOLO(model_config)
-                model.train(data=args.data,
-                            project=project,
-                            imgsz=args.imgsz,
-                            epochs=args.epochs,
-                            single_cls=False,  #如果是Ture的话只会将所有目标作为单一类别进行训练和检测
-                            batch=args.batch,
-                            workers=args.workers,
-                            device=args.device,
-                            optimizer=args.optimizer #指定训练使用的优化器。SGD 表示随机梯度下降法（Stochastic Gradient Descent），这是一种常用的优化方法。
-                            )
+                model.train(
+                    data=args.data,
+                    project=project,
+                    imgsz=args.imgsz,
+                    epochs=args.epochs,
+                    single_cls=False,  # 如果是Ture的话只会将所有目标作为单一类别进行训练和检测
+                    batch=args.batch,
+                    workers=args.workers,
+                    device=args.device,
+                    optimizer=args.optimizer,  # 指定训练使用的优化器。SGD 表示随机梯度下降法（Stochastic Gradient Descent），这是一种常用的优化方法。
+                )
             finally:
                 restore_logger_streams(previous_logger_streams)
-    return {"model": model_name, "status": "completed", "log_path": str(log_path), "project": str(project), "message": ""}
+    return {
+        "model": model_name,
+        "status": "completed",
+        "log_path": str(log_path),
+        "project": str(project),
+        "message": "",
+    }
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = parse_args()
     model_names = get_migrated_model_names(args.source_model_dir) if args.migrated else (args.models or [MODEL_NAME])
 
