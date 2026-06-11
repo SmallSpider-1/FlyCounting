@@ -1,0 +1,130 @@
+{
+  "run_id": "20260514_195536",
+  "weights": "/home/admin1/Projects/ultralytics-main/yolo26n.pt",
+  "data": "/home/admin1/Projects/ultralytics-main/data.yaml",
+  "device": "0",
+  "batch": 4,
+  "workers": 8,
+  "results": [
+    {
+      "imgsz": 640,
+      "status": "ok",
+      "metrics": {
+        "precision": 0.9723857477898483,
+        "recall": 0.978144729035032,
+        "map50": 0.9918367852700718,
+        "map50_95": 0.8520301998776295,
+        "fitness": 0.8520301998776295,
+        "speed_ms": {
+          "preprocess": 0.3862081655567674,
+          "inference": 1.626826488859113,
+          "loss": 0.0015542635819919622,
+          "postprocess": 0.06765979746434467
+        },
+        "save_dir": "/home/admin1/Projects/ultralytics-main/raspberry_pi_optimization_experiments/results/val_resolution_sweep/yolo26n_imgsz640",
+        "class_precision": [
+          0.9723857477898483
+        ],
+        "class_recall": [
+          0.978144729035032
+        ],
+        "class_map50": [
+          0.9918367852700718
+        ],
+        "class_map50_95": [
+          0.8520301998776295
+        ]
+      }
+    },
+    {
+      "imgsz": 512,
+      "status": "ok",
+      "metrics": {
+        "precision": 0.9731687244107738,
+        "recall": 0.9652777777777778,
+        "map50": 0.991194666545331,
+        "map50_95": 0.8326431101131275,
+        "fitness": 0.8326431101131275,
+        "speed_ms": {
+          "preprocess": 0.29524217413624576,
+          "inference": 1.7168662620115414,
+          "loss": 0.0015257384592122203,
+          "postprocess": 0.07657002480970126
+        },
+        "save_dir": "/home/admin1/Projects/ultralytics-main/raspberry_pi_optimization_experiments/results/val_resolution_sweep/yolo26n_imgsz512",
+        "class_precision": [
+          0.9731687244107738
+        ],
+        "class_recall": [
+          0.9652777777777778
+        ],
+        "class_map50": [
+          0.991194666545331
+        ],
+        "class_map50_95": [
+          0.8326431101131275
+        ]
+      }
+    },
+    {
+      "imgsz": 416,
+      "status": "ok",
+      "metrics": {
+        "precision": 0.969083954038461,
+        "recall": 0.9565972222222222,
+        "map50": 0.9831857768580603,
+        "map50_95": 0.788923346990856,
+        "fitness": 0.788923346990856,
+        "speed_ms": {
+          "preprocess": 0.2309357989998684,
+          "inference": 1.7184083150861442,
+          "loss": 0.0015186000663272054,
+          "postprocess": 0.07298010194799909
+        },
+        "save_dir": "/home/admin1/Projects/ultralytics-main/raspberry_pi_optimization_experiments/results/val_resolution_sweep/yolo26n_imgsz416",
+        "class_precision": [
+          0.969083954038461
+        ],
+        "class_recall": [
+          0.9565972222222222
+        ],
+        "class_map50": [
+          0.9831857768580603
+        ],
+        "class_map50_95": [
+          0.788923346990856
+        ]
+      }
+    },
+    {
+      "imgsz": 320,
+      "status": "ok",
+      "metrics": {
+        "precision": 0.9583698807585317,
+        "recall": 0.9184027777777778,
+        "map50": 0.9729546496668504,
+        "map50_95": 0.6889724963622228,
+        "fitness": 0.6889724963622228,
+        "speed_ms": {
+          "preprocess": 0.18024710650852258,
+          "inference": 1.6815163475128903,
+          "loss": 0.0016141534630221186,
+          "postprocess": 0.07137403916268104
+        },
+        "save_dir": "/home/admin1/Projects/ultralytics-main/raspberry_pi_optimization_experiments/results/val_resolution_sweep/yolo26n_imgsz320",
+        "class_precision": [
+          0.9583698807585317
+        ],
+        "class_recall": [
+          0.9184027777777778
+        ],
+        "class_map50": [
+          0.9729546496668504
+        ],
+        "class_map50_95": [
+          0.6889724963622228
+        ]
+      }
+    }
+  ]
+}

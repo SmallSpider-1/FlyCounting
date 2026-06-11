@@ -1,0 +1,29 @@
+{
+  "run_id": "20260514_201244",
+  "weights": "/home/admin1/Projects/ultralytics-main/yolo26n.pt",
+  "exports": [
+    {
+      "format": "tflite",
+      "args": {
+        "imgsz": 640,
+        "format": "tflite",
+        "device": "0"
+      },
+      "status": "error",
+      "error": "ModuleNotFoundError(\"No module named 'tensorflow'\")",
+      "traceback": "Traceback (most recent call last):\n  File \"/home/admin1/Projects/ultralytics-main/ultralytics/engine/exporter.py\", line 1056, in export_saved_model\n    import tensorflow as tf\nModuleNotFoundError: No module named 'tensorflow'\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"/home/admin1/Projects/ultralytics-main/raspberry_pi_optimization_experiments/scripts/export_backends.py\", line 40, in main\n    exported = Path(model.export(**export_args))\n  File \"/home/admin1/Projects/ultralytics-main/ultralytics/engine/model.py\", line 712, in export\n    return Exporter(overrides=args, _callbacks=self.callbacks)(model=self.model)\n  File \"/home/admin1/Projects/ultralytics-main/ultralytics/engine/exporter.py\", line 596, in __call__\n    f[5], keras_model = self.export_saved_model()\n  File \"/home/admin1/Projects/ultralytics-main/ultralytics/engine/exporter.py\", line 254, in outer_func\n    raise e\n  File \"/home/admin1/Projects/ultralytics-main/ultralytics/engine/exporter.py\", line 246, in outer_func\n    f = inner_func(*args, **kwargs)  # exported file/dir or tuple of (file/dir, *)\n  File \"/home/admin1/Projects/ultralytics-main/ultralytics/engine/exporter.py\", line 1059, in export_saved_model\n    import tensorflow as tf\nModuleNotFoundError: No module named 'tensorflow'\n"
+    },
+    {
+      "format": "tflite",
+      "args": {
+        "imgsz": 640,
+        "int8": true,
+        "format": "tflite",
+        "device": "0"
+      },
+      "status": "error",
+      "error": "ModuleNotFoundError(\"No module named 'tensorflow'\")",
+      "traceback": "Traceback (most recent call last):\n  File \"/home/admin1/Projects/ultralytics-main/ultralytics/engine/exporter.py\", line 1056, in export_saved_model\n    import tensorflow as tf\nModuleNotFoundError: No module named 'tensorflow'\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"/home/admin1/Projects/ultralytics-main/raspberry_pi_optimization_experiments/scripts/export_backends.py\", line 40, in main\n    exported = Path(model.export(**export_args))\n  File \"/home/admin1/Projects/ultralytics-main/ultralytics/engine/model.py\", line 712, in export\n    return Exporter(overrides=args, _callbacks=self.callbacks)(model=self.model)\n  File \"/home/admin1/Projects/ultralytics-main/ultralytics/engine/exporter.py\", line 596, in __call__\n    f[5], keras_model = self.export_saved_model()\n  File \"/home/admin1/Projects/ultralytics-main/ultralytics/engine/exporter.py\", line 254, in outer_func\n    raise e\n  File \"/home/admin1/Projects/ultralytics-main/ultralytics/engine/exporter.py\", line 246, in outer_func\n    f = inner_func(*args, **kwargs)  # exported file/dir or tuple of (file/dir, *)\n  File \"/home/admin1/Projects/ultralytics-main/ultralytics/engine/exporter.py\", line 1059, in export_saved_model\n    import tensorflow as tf\nModuleNotFoundError: No module named 'tensorflow'\n"
+    }
+  ]
+}

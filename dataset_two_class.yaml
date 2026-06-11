@@ -1,0 +1,11 @@
+# Custom data for two-class Bactrocera detection
+
+# train and val data as 1) directory: path/images/, 2) file: path/images.txt, or 3) list: [path1/images/, path2/images/]
+train: /home/admin1/Projects/ultralytics-yolo11-main/dataset_two_class/images/train
+val: /home/admin1/Projects/ultralytics-yolo11-main/dataset_two_class/images/val
+
+# number of classes
+nc: 2
+
+# class names
+names: ['Bactrocera correcta', 'Bactrocera dorsalis']

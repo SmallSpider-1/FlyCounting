@@ -1,0 +1,21 @@
+{
+  "project_root": "/home/admin1/Projects/ultralytics-main",
+  "weights": "/home/admin1/Projects/ultralytics-main/yolo26n.pt",
+  "data": "/home/admin1/Projects/ultralytics-main/data.yaml",
+  "device": "0",
+  "batch": 4,
+  "workers": 8,
+  "resolution_sweep": [640, 512, 416, 320],
+  "export_formats": [
+    {"format": "ncnn", "args": {"imgsz": 640}},
+    {"format": "onnx", "args": {"imgsz": 640, "simplify": true}},
+    {"format": "onnx", "args": {"imgsz": 640, "simplify": true, "dynamic": true}},
+    {"format": "tflite", "args": {"imgsz": 640}},
+    {"format": "tflite", "args": {"imgsz": 640, "int8": true}}
+  ],
+  "notes": [
+    "Run all scripts from /home/admin1/Projects/ultralytics-main.",
+    "Outputs stay inside raspberry_pi_optimization_experiments.",
+    "Raspberry Pi final timing must be repeated on the target Pi; local A100 timing is only a functional proxy."
+  ]
+}

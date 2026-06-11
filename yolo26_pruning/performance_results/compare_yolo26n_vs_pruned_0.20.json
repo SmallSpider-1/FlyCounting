@@ -1,0 +1,92 @@
+{
+  "original": {
+    "weights": "/home/admin1/Projects/ultralytics-main/yolo26n.pt",
+    "data": "/home/admin1/Projects/ultralytics-main/data.yaml",
+    "split": "val",
+    "imgsz": 640,
+    "batch": 4,
+    "device": "0",
+    "timestamp": "2026-05-14 19:39:18",
+    "metrics": {
+      "precision": 0.9723857477898483,
+      "recall": 0.978144729035032,
+      "map50": 0.9918367852700718,
+      "map50_95": 0.8520301998776295,
+      "fitness": 0.8520301998776295,
+      "speed_ms": {
+        "preprocess": 0.41062389635196456,
+        "inference": 1.5873724813318522,
+        "loss": 0.0013528635779281905,
+        "postprocess": 0.06674571259252703
+      },
+      "class_precision": [
+        0.9723857477898483
+      ],
+      "class_recall": [
+        0.978144729035032
+      ],
+      "class_map50": [
+        0.9918367852700718
+      ],
+      "class_map50_95": [
+        0.8520301998776295
+      ]
+    },
+    "save_dir": "/home/admin1/Projects/ultralytics-main/yolo26_pruning/performance_results/val_yolo26n"
+  },
+  "pruned": {
+    "weights": "/home/admin1/Projects/ultralytics-main/yolo26_pruning/yolo26_structured_prune/yolo26n_structured_pruned_0.20_20260514_192659.pt",
+    "data": "/home/admin1/Projects/ultralytics-main/data.yaml",
+    "split": "val",
+    "imgsz": 640,
+    "batch": 4,
+    "device": "0",
+    "timestamp": "2026-05-14 19:37:08",
+    "metrics": {
+      "precision": 0.9565869252448298,
+      "recall": 0.6885802108713548,
+      "map50": 0.8724070023413397,
+      "map50_95": 0.6461376422169784,
+      "fitness": 0.6461376422169784,
+      "speed_ms": {
+        "preprocess": 0.39198796543325637,
+        "inference": 2.0771516528926863,
+        "loss": 0.0013534138368448644,
+        "postprocess": 0.0691323442282784
+      },
+      "class_precision": [
+        0.9565869252448298
+      ],
+      "class_recall": [
+        0.6885802108713548
+      ],
+      "class_map50": [
+        0.8724070023413397
+      ],
+      "class_map50_95": [
+        0.6461376422169784
+      ]
+    },
+    "save_dir": "/home/admin1/Projects/ultralytics-main/yolo26_pruning/performance_results/val_yolo26n_structured_pruned_0.20_20260514_192659"
+  },
+  "delta_pruned_minus_original": {
+    "precision": -0.01579882254501852,
+    "recall": -0.28956451816367723,
+    "map50": -0.11942978292873208,
+    "map50_95": -0.20589255766065107,
+    "fitness": -0.20589255766065107,
+    "speed_preprocess_ms": -0.018635930918708188,
+    "speed_inference_ms": 0.48977917156083417,
+    "speed_postprocess_ms": 0.0023866316357513684
+  },
+  "ratio_pruned_over_original": {
+    "precision": 0.9837525153151124,
+    "recall": 0.7039655691348038,
+    "map50": 0.8795872620350413,
+    "map50_95": 0.758350633944405,
+    "fitness": 0.758350633944405,
+    "speed_preprocess": 0.9546155713676866,
+    "speed_inference": 1.3085470973705522,
+    "speed_postprocess": 1.0357570777664988
+  }
+}
