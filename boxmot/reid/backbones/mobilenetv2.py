@@ -1,6 +1,5 @@
 # Mikel Broström 🔥 BoxMOT 🧾 AGPL-3.0 license
 
-from __future__ import absolute_import, division
 
 import torch.utils.model_zoo as model_zoo
 from torch import nn
@@ -28,11 +27,11 @@ class ConvBlock(nn.Module):
         s (int or tuple): stride.
         p (int or tuple): padding.
         g (int): number of blocked connections from input channels
-            to output channels (default: 1).
+        to output channels (default: 1).
     """
 
     def __init__(self, in_c, out_c, k, s=1, p=0, g=1):
-        super(ConvBlock, self).__init__()
+        super().__init__()
         self.conv = nn.Conv2d(in_c, out_c, k, stride=s, padding=p, bias=False, groups=g)
         self.bn = nn.BatchNorm2d(out_c)
 
@@ -42,13 +41,11 @@ class ConvBlock(nn.Module):
 
 class Bottleneck(nn.Module):
     def __init__(self, in_channels, out_channels, expansion_factor, stride=1):
-        super(Bottleneck, self).__init__()
+        super().__init__()
         mid_channels = in_channels * expansion_factor
         self.use_residual = stride == 1 and in_channels == out_channels
         self.conv1 = ConvBlock(in_channels, mid_channels, 1)
-        self.dwconv2 = ConvBlock(
-            mid_channels, mid_channels, 3, stride, 1, g=mid_channels
-        )
+        self.dwconv2 = ConvBlock(mid_channels, mid_channels, 3, stride, 1, g=mid_channels)
         self.conv3 = nn.Sequential(
             nn.Conv2d(mid_channels, out_channels, 1, bias=False),
             nn.BatchNorm2d(out_channels),
@@ -67,7 +64,7 @@ class Bottleneck(nn.Module):
 class MobileNetV2(nn.Module):
     """MobileNetV2.
 
-    Reference:
+    References:
         Sandler et al. MobileNetV2: Inverted Residuals and
         Linear Bottlenecks. CVPR 2018.
 
@@ -85,7 +82,7 @@ class MobileNetV2(nn.Module):
         dropout_p=None,
         **kwargs,
     ):
-        super(MobileNetV2, self).__init__()
+        super().__init__()
         self.loss = loss
         self.in_channels = int(32 * width_mult)
         self.feature_dim = int(1280 * width_mult) if width_mult > 1 else 1280
@@ -131,9 +128,7 @@ class MobileNetV2(nn.Module):
             self.feature_dim = input_dim
             return None
 
-        assert isinstance(
-            fc_dims, (list, tuple)
-        ), "fc_dims must be either list or tuple, but got {}".format(type(fc_dims))
+        assert isinstance(fc_dims, (list, tuple)), f"fc_dims must be either list or tuple, but got {type(fc_dims)}"
 
         layers = []
         for dim in fc_dims:
@@ -195,7 +190,7 @@ class MobileNetV2(nn.Module):
         elif self.loss == "triplet":
             return y, v
         else:
-            raise KeyError("Unsupported loss: {}".format(self.loss))
+            raise KeyError(f"Unsupported loss: {self.loss}")
 
 
 def init_pretrained_weights(model, model_url):
@@ -205,19 +200,13 @@ def init_pretrained_weights(model, model_url):
     """
     pretrain_dict = model_zoo.load_url(model_url)
     model_dict = model.state_dict()
-    pretrain_dict = {
-        k: v
-        for k, v in pretrain_dict.items()
-        if k in model_dict and model_dict[k].size() == v.size()
-    }
+    pretrain_dict = {k: v for k, v in pretrain_dict.items() if k in model_dict and model_dict[k].size() == v.size()}
     model_dict.update(pretrain_dict)
     model.load_state_dict(model_dict)
 
 
 def mobilenetv2_x1_0(num_classes, loss, pretrained=True, **kwargs):
-    model = MobileNetV2(
-        num_classes, loss=loss, width_mult=1, fc_dims=None, dropout_p=None, **kwargs
-    )
+    model = MobileNetV2(num_classes, loss=loss, width_mult=1, fc_dims=None, dropout_p=None, **kwargs)
     if pretrained:
         # init_pretrained_weights(model, model_urls['mobilenetv2_x1_0'])
         import warnings
@@ -231,9 +220,7 @@ def mobilenetv2_x1_0(num_classes, loss, pretrained=True, **kwargs):
 
 
 def mobilenetv2_x1_4(num_classes, loss, pretrained=True, **kwargs):
-    model = MobileNetV2(
-        num_classes, loss=loss, width_mult=1.4, fc_dims=None, dropout_p=None, **kwargs
-    )
+    model = MobileNetV2(num_classes, loss=loss, width_mult=1.4, fc_dims=None, dropout_p=None, **kwargs)
     if pretrained:
         # init_pretrained_weights(model, model_urls['mobilenetv2_x1_4'])
         import warnings

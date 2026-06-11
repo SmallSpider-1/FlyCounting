@@ -1,16 +1,13 @@
 # Copyright (c) 2023, Tri Dao, Albert Gu.
 
 import math
-from typing import Optional
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch import Tensor
-
 from einops import rearrange, repeat
 
-from mamba_ssm.ops.selective_scan_interface import selective_scan_fn, mamba_inner_fn
+from mamba_ssm.ops.selective_scan_interface import mamba_inner_fn, selective_scan_fn
 
 try:
     from causal_conv1d import causal_conv1d_fn, causal_conv1d_update
@@ -74,9 +71,7 @@ class Mamba(nn.Module):
         self.activation = "silu"
         self.act = nn.SiLU()
 
-        self.x_proj = nn.Linear(
-            self.d_inner, self.dt_rank + self.d_state * 2, bias=False, **factory_kwargs
-        )
+        self.x_proj = nn.Linear(self.d_inner, self.dt_rank + self.d_state * 2, bias=False, **factory_kwargs)
         self.dt_proj = nn.Linear(self.dt_rank, self.d_inner, bias=True, **factory_kwargs)
 
         # Initialize special dt projection to preserve variance at initialization
@@ -90,8 +85,7 @@ class Mamba(nn.Module):
 
         # Initialize dt bias so that F.softplus(dt_bias) is between dt_min and dt_max
         dt = torch.exp(
-            torch.rand(self.d_inner, **factory_kwargs) * (math.log(dt_max) - math.log(dt_min))
-            + math.log(dt_min)
+            torch.rand(self.d_inner, **factory_kwargs) * (math.log(dt_max) - math.log(dt_min)) + math.log(dt_min)
         ).clamp(min=dt_init_floor)
         # Inverse of softplus: https://github.com/pytorch/pytorch/issues/72759
         inv_dt = dt + torch.log(-torch.expm1(-dt))
@@ -117,11 +111,9 @@ class Mamba(nn.Module):
         self.out_proj = nn.Linear(self.d_inner, self.d_model, bias=bias, **factory_kwargs)
 
     def forward(self, hidden_states, inference_params=None):
+        """hidden_states: (B, L, D) Returns: same shape as hidden_states.
         """
-        hidden_states: (B, L, D)
-        Returns: same shape as hidden_states
-        """
-        batch, seqlen, dim = hidden_states.shape
+        batch, seqlen, _dim = hidden_states.shape
 
         conv_state, ssm_state = None, None
         if inference_params is not None:
@@ -142,7 +134,9 @@ class Mamba(nn.Module):
 
         A = -torch.exp(self.A_log.float())  # (d_inner, d_state)
         # In the backward pass we write dx and dz next to each other to avoid torch.cat
-        if self.use_fast_path and causal_conv1d_fn is not None and inference_params is None:  # Doesn't support outputting the states
+        if (
+            self.use_fast_path and causal_conv1d_fn is not None and inference_params is None
+        ):  # Doesn't support outputting the states
             out = mamba_inner_fn(
                 xz,
                 self.conv1d.weight,
@@ -255,20 +249,15 @@ class Mamba(nn.Module):
     def allocate_inference_cache(self, batch_size, max_seqlen, dtype=None, **kwargs):
         device = self.out_proj.weight.device
         conv_dtype = self.conv1d.weight.dtype if dtype is None else dtype
-        conv_state = torch.zeros(
-            batch_size, self.d_model * self.expand, self.d_conv, device=device, dtype=conv_dtype
-        )
+        conv_state = torch.zeros(batch_size, self.d_model * self.expand, self.d_conv, device=device, dtype=conv_dtype)
         ssm_dtype = self.dt_proj.weight.dtype if dtype is None else dtype
         # ssm_dtype = torch.float32
-        ssm_state = torch.zeros(
-            batch_size, self.d_model * self.expand, self.d_state, device=device, dtype=ssm_dtype
-        )
+        ssm_state = torch.zeros(batch_size, self.d_model * self.expand, self.d_state, device=device, dtype=ssm_dtype)
         return conv_state, ssm_state
 
     def _get_states_from_cache(self, inference_params, batch_size, initialize_states=False):
         assert self.layer_idx is not None
         if self.layer_idx not in inference_params.key_value_memory_dict:
-            batch_shape = (batch_size,)
             conv_state = torch.zeros(
                 batch_size,
                 self.d_model * self.expand,

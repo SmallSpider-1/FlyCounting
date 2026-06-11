@@ -1,33 +1,35 @@
 import math
+from functools import partial
+from typing import Callable
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from functools import partial
-from typing import Callable
-from timm.layers import DropPath
 from einops import repeat
+from timm.layers import DropPath
 
 try:
     from mamba_ssm.ops.selective_scan_interface import selective_scan_fn
-except ImportError as e:
+except ImportError:
     pass
+
 
 class SSM2D_MB(nn.Module):
     def __init__(
-            self,
-            d_model,
-            d_state=16,
-            expand=2.,
-            dt_rank="auto",
-            dt_min=0.001,
-            dt_max=0.1,
-            dt_init="random",
-            dt_scale=1.0,
-            dt_init_floor=1e-4,
-            dropout=0.,
-            device=None,
-            dtype=None,
-            **kwargs,
+        self,
+        d_model,
+        d_state=16,
+        expand=2.0,
+        dt_rank="auto",
+        dt_min=0.001,
+        dt_max=0.1,
+        dt_init="random",
+        dt_scale=1.0,
+        dt_init_floor=1e-4,
+        dropout=0.0,
+        device=None,
+        dtype=None,
+        **kwargs,
     ):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
@@ -45,14 +47,18 @@ class SSM2D_MB(nn.Module):
         self.x_proj_weight = nn.Parameter(torch.stack([t.weight for t in self.x_proj], dim=0))
         del self.x_proj
         self.dt_projs = (
-            self.dt_init(self.dt_rank, self.d_inner, dt_scale, dt_init, dt_min, dt_max, dt_init_floor,
-                         **factory_kwargs),
-            self.dt_init(self.dt_rank, self.d_inner, dt_scale, dt_init, dt_min, dt_max, dt_init_floor,
-                         **factory_kwargs),
-            self.dt_init(self.dt_rank, self.d_inner, dt_scale, dt_init, dt_min, dt_max, dt_init_floor,
-                         **factory_kwargs),
-            self.dt_init(self.dt_rank, self.d_inner, dt_scale, dt_init, dt_min, dt_max, dt_init_floor,
-                         **factory_kwargs),
+            self.dt_init(
+                self.dt_rank, self.d_inner, dt_scale, dt_init, dt_min, dt_max, dt_init_floor, **factory_kwargs
+            ),
+            self.dt_init(
+                self.dt_rank, self.d_inner, dt_scale, dt_init, dt_min, dt_max, dt_init_floor, **factory_kwargs
+            ),
+            self.dt_init(
+                self.dt_rank, self.d_inner, dt_scale, dt_init, dt_min, dt_max, dt_init_floor, **factory_kwargs
+            ),
+            self.dt_init(
+                self.dt_rank, self.d_inner, dt_scale, dt_init, dt_min, dt_max, dt_init_floor, **factory_kwargs
+            ),
         )
         self.dt_projs_weight = nn.Parameter(torch.stack([t.weight for t in self.dt_projs], dim=0))
         self.dt_projs_bias = nn.Parameter(torch.stack([t.bias for t in self.dt_projs], dim=0))
@@ -60,14 +66,15 @@ class SSM2D_MB(nn.Module):
         self.A_logs = self.A_log_init(self.d_state, self.d_inner, copies=4, merge=True)
         self.Ds = self.D_init(self.d_inner, copies=4, merge=True)
         self.selective_scan = selective_scan_fn
-        self.dropout = nn.Dropout(dropout) if dropout > 0. else None
+        self.dropout = nn.Dropout(dropout) if dropout > 0.0 else None
 
     @staticmethod
-    def dt_init(dt_rank, d_inner, dt_scale=1.0, dt_init="random", dt_min=0.001, dt_max=0.1, dt_init_floor=1e-4,
-                **factory_kwargs):
+    def dt_init(
+        dt_rank, d_inner, dt_scale=1.0, dt_init="random", dt_min=0.001, dt_max=0.1, dt_init_floor=1e-4, **factory_kwargs
+    ):
         dt_proj = nn.Linear(dt_rank, d_inner, bias=True, **factory_kwargs)
 
-        dt_init_std = dt_rank ** -0.5 * dt_scale
+        dt_init_std = dt_rank**-0.5 * dt_scale
         if dt_init == "constant":
             nn.init.constant_(dt_proj.weight, dt_init_std)
         elif dt_init == "random":
@@ -76,8 +83,7 @@ class SSM2D_MB(nn.Module):
             raise NotImplementedError
 
         dt = torch.exp(
-            torch.rand(d_inner, **factory_kwargs) * (math.log(dt_max) - math.log(dt_min))
-            + math.log(dt_min)
+            torch.rand(d_inner, **factory_kwargs) * (math.log(dt_max) - math.log(dt_min)) + math.log(dt_min)
         ).clamp(min=dt_init_floor)
         inv_dt = dt + torch.log(-torch.expm1(-dt))
         with torch.no_grad():
@@ -115,11 +121,12 @@ class SSM2D_MB(nn.Module):
         return D
 
     def forward_core(self, x: torch.Tensor):
-        B, C, H, W = x.shape
+        B, _C, H, W = x.shape
         L = H * W
         K = 4
-        x_hwwh = torch.stack([x.view(B, -1, L), torch.transpose(x, dim0=2, dim1=3).contiguous().view(B, -1, L)],
-                             dim=1).view(B, 2, -1, L)
+        x_hwwh = torch.stack(
+            [x.view(B, -1, L), torch.transpose(x, dim0=2, dim1=3).contiguous().view(B, -1, L)], dim=1
+        ).view(B, 2, -1, L)
         xs = torch.cat([x_hwwh, torch.flip(x_hwwh, dims=[-1])], dim=1)
         x_dbl = torch.einsum("b k d l, k c d -> b k c l", xs.view(B, K, -1, L), self.x_proj_weight)
         dts, Bs, Cs = torch.split(x_dbl, [self.dt_rank, self.d_state, self.d_state], dim=2)
@@ -132,8 +139,13 @@ class SSM2D_MB(nn.Module):
         As = -torch.exp(self.A_logs.float()).view(-1, self.d_state)
         dt_projs_bias = self.dt_projs_bias.float().view(-1)
         out_y = self.selective_scan(
-            xs, dts,
-            As, Bs, Cs, Ds, z=None,
+            xs,
+            dts,
+            As,
+            Bs,
+            Cs,
+            Ds,
+            z=None,
             delta_bias=dt_projs_bias,
             delta_softplus=True,
             return_last_state=False,
@@ -147,7 +159,7 @@ class SSM2D_MB(nn.Module):
         return out_y[:, 0], inv_y[:, 0], wh_y, invwh_y
 
     def forward(self, x: torch.Tensor, **kwargs):
-        B, C, H, W = x.shape
+        B, _C, H, W = x.shape
         y1, y2, y3, y4 = self.forward_core(x)
         assert y1.dtype == torch.float32
         y = y1 + y2 + y3 + y4
@@ -157,15 +169,15 @@ class SSM2D_MB(nn.Module):
 
 class MB(nn.Module):
     def __init__(
-            self,
-            d_model,
-            d_state=16,
-            expand=2.,
-            dropout=0.,
-            bias=False,
-            device=None,
-            dtype=None,
-            **kwargs,
+        self,
+        d_model,
+        d_state=16,
+        expand=2.0,
+        dropout=0.0,
+        bias=False,
+        device=None,
+        dtype=None,
+        **kwargs,
     ):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
@@ -178,9 +190,9 @@ class MB(nn.Module):
         self.out_norm2 = nn.LayerNorm(self.d_inner)
         self.out_norm3 = nn.LayerNorm(self.d_inner)
         self.out_proj = nn.Linear(self.d_inner, self.d_model, bias=bias, **factory_kwargs)
-        self.dropout = nn.Dropout(dropout) if dropout > 0. else None
+        self.dropout = nn.Dropout(dropout) if dropout > 0.0 else None
         self.pooling = nn.MaxPool2d(kernel_size=(2, 2))
-        self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        self.up = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
         self.ca1 = nn.Sequential(
             nn.Conv2d(
                 in_channels=self.d_inner,
@@ -188,8 +200,10 @@ class MB(nn.Module):
                 groups=self.d_inner,
                 bias=True,
                 kernel_size=3,
-                padding=(3 - 1) // 2, ),
-            nn.SiLU())
+                padding=(3 - 1) // 2,
+            ),
+            nn.SiLU(),
+        )
         self.ca2 = nn.Sequential(
             nn.Conv2d(
                 in_channels=self.d_inner,
@@ -197,8 +211,10 @@ class MB(nn.Module):
                 groups=self.d_inner,
                 bias=True,
                 kernel_size=3,
-                padding=(3 - 1) // 2, ),
-            nn.SiLU())
+                padding=(3 - 1) // 2,
+            ),
+            nn.SiLU(),
+        )
         self.ca3 = nn.Sequential(
             nn.Conv2d(
                 in_channels=self.d_inner,
@@ -206,17 +222,16 @@ class MB(nn.Module):
                 groups=self.d_inner,
                 bias=True,
                 kernel_size=3,
-                padding=(3 - 1) // 2, ),
-            nn.SiLU())
-        self.ssm1 = SSM2D_MB(d_model=self.d_model, d_state=self.d_state, expand=self.expand,
-                             **kwargs)
-        self.ssm2 = SSM2D_MB(d_model=self.d_model, d_state=self.d_state, expand=self.expand,
-                             **kwargs)
-        self.ssm3 = SSM2D_MB(d_model=self.d_model, d_state=self.d_state, expand=self.expand,
-                             **kwargs)
+                padding=(3 - 1) // 2,
+            ),
+            nn.SiLU(),
+        )
+        self.ssm1 = SSM2D_MB(d_model=self.d_model, d_state=self.d_state, expand=self.expand, **kwargs)
+        self.ssm2 = SSM2D_MB(d_model=self.d_model, d_state=self.d_state, expand=self.expand, **kwargs)
+        self.ssm3 = SSM2D_MB(d_model=self.d_model, d_state=self.d_state, expand=self.expand, **kwargs)
 
     def forward(self, x: torch.Tensor, **kwargs):
-        B, H, W, C = x.shape
+        _B, _H, _W, _C = x.shape
         skip = x
         x_dtype = x.dtype
         xz = self.in_proj(x)
@@ -265,19 +280,19 @@ class AB(nn.Module):
         self.mlp1 = nn.Sequential(
             nn.Conv2d(in_channels=num_feat // 2, out_channels=num_feat // 2, kernel_size=1, padding=0),
             nn.ReLU(inplace=True),
-            nn.Conv2d(in_channels=num_feat // 2, out_channels=num_feat // 2, kernel_size=1, padding=0)
+            nn.Conv2d(in_channels=num_feat // 2, out_channels=num_feat // 2, kernel_size=1, padding=0),
         )
         self.mlp2 = nn.Sequential(
             nn.Conv2d(in_channels=num_feat // 2, out_channels=num_feat // 2, kernel_size=1, padding=0),
             nn.ReLU(inplace=True),
-            nn.Conv2d(in_channels=num_feat // 2, out_channels=num_feat // 2, kernel_size=1, padding=0)
+            nn.Conv2d(in_channels=num_feat // 2, out_channels=num_feat // 2, kernel_size=1, padding=0),
         )
         self.sigmoid1 = nn.Sigmoid()
         self.sigmoid2 = nn.Sigmoid()
 
     def forward(self, x):  # 输入 BHWC 输出 BHWC
         x = x.permute(0, 3, 1, 2).contiguous()
-        B, C, H, W = x.shape
+        _B, C, _H, _W = x.shape
         x = self.conv(x)
         skip = x
         x1, x2 = torch.split(x, C // 2, dim=1)
@@ -310,7 +325,7 @@ class FB(nn.Module):
         )
 
     def forward(self, x):  # 输入 BHWC 输出 BHWC
-        B, H, W, C = x.shape
+        _B, H, W, _C = x.shape
         skip = x
         x_dtype = x.dtype
         x = x.permute(0, 3, 1, 2).contiguous()
@@ -322,7 +337,7 @@ class FB(nn.Module):
         real = a * torch.cos(p)
         imag = a * torch.sin(p)
         out = torch.complex(real.float(), imag.float()) + 1e-8
-        out = torch.fft.irfft2(out, s=(H, W), norm='backward') + 1e-8
+        out = torch.fft.irfft2(out, s=(H, W), norm="backward") + 1e-8
         out = torch.abs(out) + 1e-8
 
         out = out.permute(0, 2, 3, 1).contiguous().to(x_dtype)
@@ -330,21 +345,21 @@ class FB(nn.Module):
 
         return out
 
+
 class SFMB(nn.Module):
     def __init__(
-            self,
-            hidden_dim: int = 0,
-            drop_path: float = 0,
-            norm_layer: Callable[..., torch.nn.Module] = partial(nn.LayerNorm, eps=1e-6),
-            attn_drop_rate: float = 0,
-            d_state: int = 16,
-            mlp_ratio: float = 2.,
-            **kwargs,
+        self,
+        hidden_dim: int = 0,
+        drop_path: float = 0,
+        norm_layer: Callable[..., torch.nn.Module] = partial(nn.LayerNorm, eps=1e-6),
+        attn_drop_rate: float = 0,
+        d_state: int = 16,
+        mlp_ratio: float = 2.0,
+        **kwargs,
     ):
         super().__init__()
         self.ln = norm_layer(hidden_dim)
-        self.mamba = MB(d_model=hidden_dim, d_state=d_state, expand=mlp_ratio, dropout=attn_drop_rate,
-                        **kwargs)
+        self.mamba = MB(d_model=hidden_dim, d_state=d_state, expand=mlp_ratio, dropout=attn_drop_rate, **kwargs)
         self.drop_path = DropPath(drop_path)
         self.attention = AB(hidden_dim)
         self.frequency = FB(hidden_dim)

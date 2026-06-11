@@ -55,7 +55,7 @@ class TensorRTBackend(BaseModelBackend):
                 dtype = trt.nptype(self.model_.get_tensor_dtype(name))
                 is_input = self.model_.get_tensor_mode(name) == trt.TensorIOMode.INPUT
                 if is_input and -1 in tuple(self.model_.get_tensor_shape(name)):
-                        self.context.set_input_shape(name, tuple(self.model_.get_tensor_profile_shape(name, 0)[1]))
+                    self.context.set_input_shape(name, tuple(self.model_.get_tensor_profile_shape(name, 0)[1]))
                 if is_input and dtype == np.float16:
                     self.fp16 = True
 
@@ -69,7 +69,7 @@ class TensorRTBackend(BaseModelBackend):
                 # Handle dynamic shapes
                 if is_input and -1 in self.model_.get_binding_shape(index):
                     profile_index = 0
-                    min_shape, opt_shape, max_shape = self.model_.get_profile_shape(profile_index, index)
+                    _min_shape, opt_shape, _max_shape = self.model_.get_profile_shape(profile_index, index)
                     self.context.set_binding_shape(index, opt_shape)
 
                 if is_input and dtype == np.float16:
@@ -118,7 +118,6 @@ class TensorRTBackend(BaseModelBackend):
             # Adjust for dynamic shapes
             if temp_batch.shape != self.bindings[self.input_name].shape:
                 if self.is_trt10:
-
                     self.context.set_input_shape(self.input_name, temp_batch.shape)
                     self.bindings[self.input_name] = self.bindings[self.input_name]._replace(shape=temp_batch.shape)
                     self.bindings[self.output_name].data.resize_(tuple(self.context.get_tensor_shape(self.output_name)))

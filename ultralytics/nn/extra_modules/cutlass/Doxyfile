@@ -1056,7 +1056,7 @@ HTML_STYLESHEET        =
 # defined cascading style sheet that is included after the standard style sheets
 # created by doxygen. Using this option one can overrule certain style aspects.
 # This is preferred over using HTML_STYLESHEET since it does not replace the
-# standard style sheet and is therefor more robust against future updates.
+# standard style sheet and is therefore more robust against future updates.
 # Doxygen will copy the style sheet file to the output directory. For an example
 # see the documentation.
 # This tag requires that the tag GENERATE_HTML is set to YES.
@@ -1463,7 +1463,7 @@ SEARCHENGINE           = YES
 
 # When the SERVER_BASED_SEARCH tag is enabled the search engine will be
 # implemented using a web server instead of a web client using Javascript. There
-# are two flavours of web server based searching depending on the
+# are two flavors of web server based searching depending on the
 # EXTERNAL_SEARCH setting. When disabled, doxygen will generate a PHP script for
 # searching and an index file used by the script. When EXTERNAL_SEARCH is
 # enabled the indexing and searching needs to be provided by external tools. See
@@ -1940,7 +1940,7 @@ PREDEFINED             =
 EXPAND_AS_DEFINED      =
 
 # If the SKIP_FUNCTION_MACROS tag is set to YES then doxygen's preprocessor will
-# remove all refrences to function-like macros that are alone on a line, have an
+# remove all references to function-like macros that are alone on a line, have an
 # all uppercase name, and do not end with a semicolon. Such function macros are
 # typically used for boiler-plate code, and will confuse the parser if not
 # removed.

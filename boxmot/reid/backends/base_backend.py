@@ -9,7 +9,8 @@ import torch
 from filelock import SoftFileLock
 
 from boxmot.reid.core.registry import ReIDModelRegistry
-from boxmot.utils import WEIGHTS, logger as LOGGER
+from boxmot.utils import WEIGHTS
+from boxmot.utils import logger as LOGGER
 from boxmot.utils.checks import RequirementsChecker
 
 
@@ -51,7 +52,7 @@ class BaseModelBackend:
             input_shape = (384, 128)
         elif "hacnn" in self.model_name:
             input_shape = (160, 64)
-        else: 
+        else:
             input_shape = (256, 128)
         self.input_shape = input_shape
 
@@ -96,7 +97,7 @@ class BaseModelBackend:
         return cv2.warpPerspective(
             img,
             matrix,
-            (max(int(round(bw)), 1), max(int(round(bh)), 1)),
+            (max(round(bw), 1), max(round(bh), 1)),
             flags=cv2.INTER_LINEAR,
             borderMode=cv2.BORDER_CONSTANT,
             borderValue=(0, 0, 0),
@@ -109,8 +110,7 @@ class BaseModelBackend:
 
     @classmethod
     def _boxes_to_xyxy(cls, boxes: np.ndarray) -> np.ndarray:
-        """
-        Normalize AABB/OBB detections to `[x1, y1, x2, y2]` for ReID cropping.
+        """Normalize AABB/OBB detections to `[x1, y1, x2, y2]` for ReID cropping.
 
         Accepted layouts:
         - AABB: `[x1, y1, x2, y2]` or rows with at least 4 leading AABB coordinates
@@ -139,7 +139,7 @@ class BaseModelBackend:
             xyxys = xyxys.reshape(0, 4)
         elif xyxys.ndim == 1:
             xyxys = xyxys.reshape(1, -1)
-        
+
         # Preallocate tensor for crops
         num_crops = len(xyxys)
         crops = torch.empty(
@@ -173,9 +173,7 @@ class BaseModelBackend:
             crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
 
             # Convert to tensor and normalize (convert to [0, 1] by dividing by 255 in batch later)
-            crop = torch.from_numpy(crop).to(
-                self.device, dtype=torch.half if self.half else torch.float
-            )
+            crop = torch.from_numpy(crop).to(self.device, dtype=torch.half if self.half else torch.float)
             crops[i] = torch.permute(crop, (2, 0, 1))  # Change to (C, H, W)
 
         # Normalize the entire batch in one go
@@ -202,9 +200,7 @@ class BaseModelBackend:
         # warmup model by running inference once
         if self.device.type != "cpu":
             im = np.random.randint(0, 255, *imgsz, dtype=np.uint8)
-            crops = self.get_crops(
-                xyxys=np.array([[0, 0, 64, 64], [0, 0, 128, 128]]), img=im
-            )
+            crops = self.get_crops(xyxys=np.array([[0, 0, 64, 64], [0, 0, 128, 128]]), img=im)
             crops = self.inference_preprocess(crops)
             self.forward(crops)  # warmup
 
@@ -229,9 +225,7 @@ class BaseModelBackend:
 
     def inference_postprocess(self, features):
         if isinstance(features, (list, tuple)):
-            return (
-                self.to_numpy(features[0]) if len(features) == 1 else [self.to_numpy(x) for x in features]
-            )
+            return self.to_numpy(features[0]) if len(features) == 1 else [self.to_numpy(x) for x in features]
         else:
             return self.to_numpy(features)
 
@@ -243,9 +237,8 @@ class BaseModelBackend:
     def load_model(self, w):
         raise NotImplementedError("This method should be implemented by subclasses.")
 
-
     def download_model(self, w):
-        if isinstance(w, str): 
+        if isinstance(w, str):
             w = Path(w)
         w = WEIGHTS / w.name
 
@@ -266,8 +259,5 @@ class BaseModelBackend:
                 LOGGER.info(f"[PID {os.getpid()}] Downloading ReID weights from {model_url} → {w}")
                 gdown.download(model_url, str(w), quiet=False)
             else:
-                LOGGER.error(
-                    f"No URL associated with the chosen ReID weights ({w}).\n"
-                    f"Choose one of the following:"
-                )
+                LOGGER.error(f"No URL associated with the chosen ReID weights ({w}).\nChoose one of the following:")
                 ReIDModelRegistry.show_downloadable_models()

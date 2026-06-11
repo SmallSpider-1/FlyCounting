@@ -53,8 +53,7 @@ class DetectionLayout:
 
     def validate_dets(self, dets: np.ndarray) -> None:
         assert dets.shape[1] == self.det_cols, (
-            "Unsupported 'dets' 2nd dimension length, valid length is "
-            f"{self.det_cols} {self.name}"
+            f"Unsupported 'dets' 2nd dimension length, valid length is {self.det_cols} {self.name}"
         )
 
 

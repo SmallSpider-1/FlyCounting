@@ -1,10 +1,10 @@
 # Copyright (c) 2024, Tri Dao, Albert Gu.
 
 import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from einops import rearrange, repeat
 
 try:
@@ -13,12 +13,12 @@ except ImportError:
     causal_conv1d_fn = None
 
 try:
-    from mamba_ssm.ops.triton.layernorm_gated import RMSNorm as RMSNormGated, LayerNorm
+    from mamba_ssm.ops.triton.layernorm_gated import LayerNorm
+    from mamba_ssm.ops.triton.layernorm_gated import RMSNorm as RMSNormGated
 except ImportError:
     RMSNormGated, LayerNorm = None, None
 
-from mamba_ssm.ops.triton.ssd_combined import mamba_chunk_scan_combined
-from mamba_ssm.ops.triton.ssd_combined import mamba_split_conv1d_scan_combined
+from mamba_ssm.ops.triton.ssd_combined import mamba_chunk_scan_combined, mamba_split_conv1d_scan_combined
 
 
 class Mamba2Simple(nn.Module):
@@ -92,8 +92,7 @@ class Mamba2Simple(nn.Module):
 
         # Initialize log dt bias
         dt = torch.exp(
-            torch.rand(self.nheads, **factory_kwargs) * (math.log(dt_max) - math.log(dt_min))
-            + math.log(dt_min)
+            torch.rand(self.nheads, **factory_kwargs) * (math.log(dt_max) - math.log(dt_min)) + math.log(dt_min)
         )
         dt = torch.clamp(dt, min=dt_init_floor)
         # Inverse of softplus: https://github.com/pytorch/pytorch/issues/72759
@@ -122,15 +121,13 @@ class Mamba2Simple(nn.Module):
         self.out_proj = nn.Linear(self.d_inner, self.d_model, bias=bias, **factory_kwargs)
 
     def forward(self, u, seq_idx=None):
+        """u: (B, L, D) Returns: same shape as u.
         """
-        u: (B, L, D)
-        Returns: same shape as u
-        """
-        batch, seqlen, dim = u.shape
+        batch, _seqlen, _dim = u.shape
 
         zxbcdt = self.in_proj(u)  # (B, L, d_in_proj)
         A = -torch.exp(self.A_log)  # (nheads) or (d_inner, d_state)
-        initial_states=repeat(self.init_states, "... -> b ...", b=batch) if self.learnable_init_states else None
+        initial_states = repeat(self.init_states, "... -> b ...", b=batch) if self.learnable_init_states else None
         dt_limit_kwargs = {} if self.dt_limit == (0.0, float("inf")) else dict(dt_limit=self.dt_limit)
 
         if self.use_mem_eff_path:
