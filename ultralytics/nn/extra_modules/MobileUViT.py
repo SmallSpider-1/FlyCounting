@@ -1,8 +1,8 @@
-import torch
 import torch.nn as nn
 from timm.layers import DropPath
 
-__all__ = ['LGLBlock']
+__all__ = ["LGLBlock"]
+
 
 class Residual(nn.Module):
     def __init__(self, fn):
@@ -15,28 +15,41 @@ class Residual(nn.Module):
 
 class ConvUtr(nn.Module):
     def __init__(self, ch_in, ch_out, depth=1, kernel=3):
-        super(ConvUtr, self).__init__()
+        super().__init__()
         self.block = nn.Sequential(
-            *[nn.Sequential(
-                Residual(nn.Sequential(
-                    nn.Conv2d(ch_in, ch_in, kernel_size=(kernel, kernel), groups=ch_in, padding=(kernel // 2, kernel // 2)),
-                    nn.GELU(),
-                    nn.BatchNorm2d(ch_in)
-                )),
-                Residual(nn.Sequential(
-                    nn.Conv2d(ch_in, ch_in * 4, kernel_size=(1, 1)),
-                    nn.GELU(),
-                    nn.BatchNorm2d(ch_in * 4),
-                    nn.Conv2d(ch_in * 4, ch_in, kernel_size=(1, 1)),
-                    nn.GELU(),
-                    nn.BatchNorm2d(ch_in)
-                )),
-            ) for i in range(depth)]
+            *[
+                nn.Sequential(
+                    Residual(
+                        nn.Sequential(
+                            nn.Conv2d(
+                                ch_in,
+                                ch_in,
+                                kernel_size=(kernel, kernel),
+                                groups=ch_in,
+                                padding=(kernel // 2, kernel // 2),
+                            ),
+                            nn.GELU(),
+                            nn.BatchNorm2d(ch_in),
+                        )
+                    ),
+                    Residual(
+                        nn.Sequential(
+                            nn.Conv2d(ch_in, ch_in * 4, kernel_size=(1, 1)),
+                            nn.GELU(),
+                            nn.BatchNorm2d(ch_in * 4),
+                            nn.Conv2d(ch_in * 4, ch_in, kernel_size=(1, 1)),
+                            nn.GELU(),
+                            nn.BatchNorm2d(ch_in),
+                        )
+                    ),
+                )
+                for i in range(depth)
+            ]
         )
         self.up = nn.Sequential(
             nn.Conv2d(ch_in, ch_out, kernel_size=3, stride=1, padding=1, bias=True),
             nn.BatchNorm2d(ch_out),
-            nn.ReLU(inplace=True)
+            nn.ReLU(inplace=True),
         )
 
     def forward(self, x):
@@ -47,11 +60,11 @@ class ConvUtr(nn.Module):
 
 class Embeddings(nn.Module):
     def __init__(self, inch=3, dims=[8, 16, 32], depths=[1, 1, 3], kernels=[3, 3, 7]):
-        super(Embeddings, self).__init__()
+        super().__init__()
         self.stem = nn.Sequential(
             nn.Conv2d(inch, dims[0], kernel_size=3, stride=1, padding=1, bias=True),
             nn.BatchNorm2d(dims[0]),
-            nn.ReLU(inplace=True)
+            nn.ReLU(inplace=True),
         )
         self.layer1 = ConvUtr(dims[0], dims[0], depth=depths[0], kernel=kernels[0])
         self.layer2 = ConvUtr(dims[0], dims[1], depth=depths[1], kernel=kernels[1])
@@ -72,7 +85,7 @@ class Embeddings(nn.Module):
 
 
 class Mlp(nn.Module):
-    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
+    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.0):
         super().__init__()
         out_features = out_features or in_features
         hidden_features = hidden_features or in_features
@@ -91,7 +104,7 @@ class Mlp(nn.Module):
 
 
 class CMlp(nn.Module):
-    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
+    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.0):
         super().__init__()
         out_features = out_features or in_features
         hidden_features = hidden_features or in_features
@@ -110,12 +123,12 @@ class CMlp(nn.Module):
 
 
 class GlobalSparseAttn(nn.Module):
-    def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0., sr_ratio=1.):
+    def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0.0, proj_drop=0.0, sr_ratio=1.0):
         super().__init__()
         self.num_heads = num_heads
         head_dim = dim // num_heads
 
-        self.scale = qk_scale or head_dim ** -0.5
+        self.scale = qk_scale or head_dim**-0.5
         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
         self.attn_drop = nn.Dropout(attn_drop)
         self.proj = nn.Linear(dim, dim)
@@ -133,8 +146,8 @@ class GlobalSparseAttn(nn.Module):
             self.norm = nn.Identity()
 
     def forward(self, x, H: int, W: int):
-        B, N, C = x.shape
-        if self.sr > 1.:
+        B, _N, C = x.shape
+        if self.sr > 1.0:
             x = x.transpose(1, 2).reshape(B, C, H, W)
             x = self.sampler(x)
             x = x.flatten(2).transpose(1, 2)
@@ -157,14 +170,14 @@ class GlobalSparseAttn(nn.Module):
 
 
 class LocalAgg(nn.Module):
-    def __init__(self, dim, mlp_ratio=4., drop=0., drop_path=0., act_layer=nn.GELU):
+    def __init__(self, dim, mlp_ratio=4.0, drop=0.0, drop_path=0.0, act_layer=nn.GELU):
         super().__init__()
         self.pos_embed = nn.Conv2d(dim, dim, 9, padding=4, groups=dim)
         self.norm1 = nn.BatchNorm2d(dim)
         self.conv1 = nn.Conv2d(dim, dim, 1)
         self.conv2 = nn.Conv2d(dim, dim, 1)
         self.attn = nn.Conv2d(dim, dim, 9, padding=4, groups=dim)
-        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+        self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
         self.norm2 = nn.BatchNorm2d(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
         self.mlp = CMlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
@@ -178,16 +191,33 @@ class LocalAgg(nn.Module):
 
 
 class SelfAttn(nn.Module):
-    def __init__(self, dim, num_heads, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
-                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=1.):
+    def __init__(
+        self,
+        dim,
+        num_heads,
+        mlp_ratio=4.0,
+        qkv_bias=False,
+        qk_scale=None,
+        drop=0.0,
+        attn_drop=0.0,
+        drop_path=0.0,
+        act_layer=nn.GELU,
+        norm_layer=nn.LayerNorm,
+        sr_ratio=1.0,
+    ):
         super().__init__()
         self.pos_embed = nn.Conv2d(dim, dim, 3, padding=1, groups=dim)
         self.norm1 = norm_layer(dim)
         self.attn = GlobalSparseAttn(
             dim,
-            num_heads=num_heads, qkv_bias=qkv_bias, qk_scale=qk_scale,
-            attn_drop=attn_drop, proj_drop=drop, sr_ratio=sr_ratio)
-        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+            num_heads=num_heads,
+            qkv_bias=qkv_bias,
+            qk_scale=qk_scale,
+            attn_drop=attn_drop,
+            proj_drop=drop,
+            sr_ratio=sr_ratio,
+        )
+        self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
         self.norm2 = norm_layer(dim)
         mlp_hidden_dim = int(dim * mlp_ratio)
         self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
@@ -201,9 +231,22 @@ class SelfAttn(nn.Module):
         x = x.transpose(1, 2).reshape(B, N, H, W)
         return x
 
+
 class LGLBlock(nn.Module):
-    def __init__(self, dim, num_heads=8, mlp_ratio=4., qkv_bias=False, qk_scale=None, drop=0., attn_drop=0.,
-                 drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, sr_ratio=2):
+    def __init__(
+        self,
+        dim,
+        num_heads=8,
+        mlp_ratio=4.0,
+        qkv_bias=False,
+        qk_scale=None,
+        drop=0.0,
+        attn_drop=0.0,
+        drop_path=0.0,
+        act_layer=nn.GELU,
+        norm_layer=nn.LayerNorm,
+        sr_ratio=2,
+    ):
         super().__init__()
 
         if sr_ratio > 1:
@@ -211,8 +254,9 @@ class LGLBlock(nn.Module):
         else:
             self.LocalAgg = nn.Identity()
 
-        self.SelfAttn = SelfAttn(dim, num_heads, mlp_ratio, qkv_bias, qk_scale, drop, attn_drop, drop_path, act_layer,
-                                 norm_layer, sr_ratio)
+        self.SelfAttn = SelfAttn(
+            dim, num_heads, mlp_ratio, qkv_bias, qk_scale, drop, attn_drop, drop_path, act_layer, norm_layer, sr_ratio
+        )
 
     def forward(self, x):
         x = self.LocalAgg(x)

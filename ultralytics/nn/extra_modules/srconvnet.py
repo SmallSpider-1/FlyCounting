@@ -1,17 +1,16 @@
 import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from einops import rearrange
-import os
 
-__all__ = ['FMABlock']
+__all__ = ["FMABlock"]
+
 
 class MeanShift(nn.Conv2d):
-    def __init__(
-            self, rgb_range,
-            rgb_mean=(0.4488, 0.4371, 0.4040), rgb_std=(1.0, 1.0, 1.0), sign=-1):
-        super(MeanShift, self).__init__(3, 3, kernel_size=1)
+    def __init__(self, rgb_range, rgb_mean=(0.4488, 0.4371, 0.4040), rgb_std=(1.0, 1.0, 1.0), sign=-1):
+        super().__init__(3, 3, kernel_size=1)
         std = torch.Tensor(rgb_std)
         self.weight.data = torch.eye(3).view(3, 3, 1, 1) / std.view(3, 1, 1, 1)
         self.bias.data = sign * rgb_range * torch.Tensor(rgb_mean) / std
@@ -20,8 +19,8 @@ class MeanShift(nn.Conv2d):
 
 
 class LayerNorm(nn.Module):
-    r""" From ConvNeXt (https://arxiv.org/pdf/2201.03545.pdf)
-    """
+    r"""From ConvNeXt (https://arxiv.org/pdf/2201.03545.pdf)."""
+
     def __init__(self, normalized_shape, eps=1e-6, data_format="channels_last"):
         super().__init__()
         self.weight = nn.Parameter(torch.ones(normalized_shape))
@@ -44,44 +43,51 @@ class LayerNorm(nn.Module):
 
 
 class FourierUnit(nn.Module):
-    def __init__(self, dim, groups=1, fft_norm='ortho'):
+    def __init__(self, dim, groups=1, fft_norm="ortho"):
         super().__init__()
         self.groups = groups
         self.fft_norm = fft_norm
 
-        self.conv_layer = nn.Conv2d(in_channels=dim * 2, out_channels=dim * 2, kernel_size=1, stride=1,
-                                    padding=0, groups=self.groups, bias=False)
+        self.conv_layer = nn.Conv2d(
+            in_channels=dim * 2,
+            out_channels=dim * 2,
+            kernel_size=1,
+            stride=1,
+            padding=0,
+            groups=self.groups,
+            bias=False,
+        )
         self.act = nn.GELU()
 
     def forward(self, x):
-        batch, c, h, w = x.size()
-        r_size = x.size()
+        batch, _c, h, w = x.size()
+        x.size()
         dtype = x.dtype
-        
+
         # 使用新的 FFT API
         # torch.fft.rfft2 替代 torch.rfft
-        ffted = torch.fft.rfft2(x.float(), norm='ortho')  # (batch, c, h, w//2+1)
-        
+        ffted = torch.fft.rfft2(x.float(), norm="ortho")  # (batch, c, h, w//2+1)
+
         # 将复数转换为实数表示 (batch, c, h, w//2+1, 2)
         ffted = torch.stack([ffted.real, ffted.imag], dim=-1)
-        
+
         # (batch, c, 2, h, w//2+1)
         ffted = ffted.permute(0, 1, 4, 2, 3).contiguous()
-        ffted = ffted.view((batch, -1,) + ffted.size()[3:])
+        ffted = ffted.view((batch, -1, *ffted.size()[3:]))
         ffted = self.conv_layer(ffted.to(dtype))  # (batch, c*2, h, w//2+1)
         ffted = self.act(ffted).float()
 
         # (batch, c, 2, h, w//2+1)
-        ffted = ffted.view((batch, -1, 2,) + ffted.size()[2:])
+        ffted = ffted.view((batch, -1, 2, *ffted.size()[2:]))
         # (batch, c, h, w//2+1, 2)
         ffted = ffted.permute(0, 1, 3, 4, 2).contiguous()
-        
+
         # 将实数表示转换回复数
         ffted_complex = torch.complex(ffted[..., 0].float(), ffted[..., 1].float())
-        
+
         # 使用 torch.fft.irfft2 替代 torch.irfft
-        output = torch.fft.irfft2(ffted_complex, s=(h, w), norm='ortho')
-        
+        output = torch.fft.irfft2(ffted_complex, s=(h, w), norm="ortho")
+
         return output.to(dtype)
 
 
@@ -99,15 +105,15 @@ class FConvMod(nn.Module):
         self.proj = nn.Conv2d(dim, dim, 1)
 
     def forward(self, x):
-        B, C, H, W = x.shape
+        _B, _C, H, W = x.shape
         N = H * W
         shortcut = x
         pos_embed = self.CPE(x)
         x = self.norm(x)
         a = self.a(x)
         v = self.v(x)
-        a = rearrange(a, 'b (head c) h w -> b head c (h w)', head=self.num_heads)
-        v = rearrange(v, 'b (head c) h w -> b head c (h w)', head=self.num_heads)
+        a = rearrange(a, "b (head c) h w -> b head c (h w)", head=self.num_heads)
+        v = rearrange(v, "b (head c) h w -> b head c (h w)", head=self.num_heads)
         a_all = torch.split(a, math.ceil(N // 4), dim=-1)
         v_all = torch.split(v, math.ceil(N // 4), dim=-1)
         attns = []
@@ -117,11 +123,11 @@ class FConvMod(nn.Module):
             attns.append(attn)
         x = torch.cat(attns, dim=-1)
         x = F.softmax(x, dim=-1)
-        x = rearrange(x, 'b head c (h w) -> b (head c) h w', head=self.num_heads, h=H, w=W)
+        x = rearrange(x, "b head c (h w) -> b (head c) h w", head=self.num_heads, h=H, w=W)
         x = x + pos_embed
         x = self.proj(x)
         out = x + shortcut
-        
+
         return out
 
 
@@ -133,8 +139,9 @@ class KernelAggregation(nn.Module):
         self.num_kernels = num_kernels
         self.kernel_size = kernel_size
         self.dim = dim
-        self.weight = nn.Parameter(torch.randn(num_kernels, dim, dim // groups, kernel_size, kernel_size),
-                                   requires_grad=True)
+        self.weight = nn.Parameter(
+            torch.randn(num_kernels, dim, dim // groups, kernel_size, kernel_size), requires_grad=True
+        )
         if bias:
             self.bias = nn.Parameter(torch.zeros(num_kernels, dim))
         else:
@@ -148,19 +155,20 @@ class KernelAggregation(nn.Module):
             nn.init.kaiming_uniform_(self.weight[i])
 
     def forward(self, x, attention):
-        B, C, H, W = x.shape
+        B, _C, H, W = x.shape
         x = x.contiguous().view(1, B * self.dim, H, W)
 
         weight = self.weight.contiguous().view(self.num_kernels, -1)
-        weight = torch.mm(attention, weight).contiguous().view(B * self.dim, self.dim // self.groups,
-                                                               self.kernel_size, self.kernel_size)
+        weight = (
+            torch.mm(attention, weight)
+            .contiguous()
+            .view(B * self.dim, self.dim // self.groups, self.kernel_size, self.kernel_size)
+        )
         if self.bias is not None:
             bias = torch.mm(attention, self.bias).contiguous().view(-1)
-            x = F.conv2d(x, weight=weight, bias=bias, stride=1, padding=self.kernel_size // 2,
-                         groups=self.groups * B)
+            x = F.conv2d(x, weight=weight, bias=bias, stride=1, padding=self.kernel_size // 2, groups=self.groups * B)
         else:
-            x = F.conv2d(x, weight=weight, bias=None, stride=1, padding=self.kernel_size // 2,
-                         groups=self.groups * B)
+            x = F.conv2d(x, weight=weight, bias=None, stride=1, padding=self.kernel_size // 2, groups=self.groups * B)
         x = x.contiguous().view(B, self.dim, x.shape[-2], x.shape[-1])
 
         return x
@@ -207,8 +215,7 @@ class DyConv(nn.Module):
     def __init__(self, dim, kernel_size, groups, num_kernels=1):
         super().__init__()
         if num_kernels > 1:
-            self.conv = DynamicKernelAggregation(dim, kernel_size=kernel_size, groups=groups,
-                                                 num_kernels=num_kernels)
+            self.conv = DynamicKernelAggregation(dim, kernel_size=kernel_size, groups=groups, num_kernels=num_kernels)
         else:
             self.conv = nn.Conv2d(dim, dim, kernel_size=kernel_size, groups=groups)
 
@@ -235,8 +242,8 @@ class MixFFN(nn.Module):
         x1 = self.act(self.conv1(x1)).unsqueeze(dim=2)
         x2 = self.act(self.conv2(x2)).unsqueeze(dim=2)
         x = torch.cat([x1, x2], dim=2)
-        x = rearrange(x, 'b c g h w -> b (c g) h w')
-        x = self.proj_out(x) 
+        x = rearrange(x, "b c g h w -> b (c g) h w")
+        x = self.proj_out(x)
         x = x + shortcut
         return x
 
@@ -250,5 +257,5 @@ class FMABlock(nn.Module):
     def forward(self, x):
         x = self.attention(x)
         x = self.ffn(x)
-        
+
         return x

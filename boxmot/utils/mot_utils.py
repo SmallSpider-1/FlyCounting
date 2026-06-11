@@ -1,22 +1,22 @@
 # Mikel Broström 🔥 BoxMOT 🧾 AGPL-3.0 license
 
+from __future__ import annotations
+
 import re
 from pathlib import Path
-from typing import Tuple, Union
 
 import numpy as np
 import pandas as pd
 import torch
+
+from boxmot.utils import logger as LOGGER
 from ultralytics.engine.results import Results
 from ultralytics.utils import ops
 
-from boxmot.utils import logger as LOGGER
 
-
-def split_dataset(src_fldr: Path, percent_to_delete: float = 0.5) -> Tuple[Path, str]:
-    """
-    Copies the dataset to a new location and removes a specified percentage of images and annotations,
-    adjusting the frame index to start at 1. Works for MOT17, MOT20, etc.
+def split_dataset(src_fldr: Path, percent_to_delete: float = 0.5) -> tuple[Path, str]:
+    """Copies the dataset to a new location and removes a specified percentage of images and annotations, adjusting the
+    frame index to start at 1. Works for MOT17, MOT20, etc.
 
     Args:
         src_fldr (Path): Source folder (e.g. /…/MOT20/train or /…/MOT20/test)
@@ -66,7 +66,7 @@ def split_dataset(src_fldr: Path, percent_to_delete: float = 0.5) -> Tuple[Path,
             LOGGER.info(f"`{seq_path}` already ≤ split size, skipping.")
             continue
 
-        LOGGER.info(f"{seq_path.name}: keeping frames {split_frame+1}-{max_frame}")
+        LOGGER.info(f"{seq_path.name}: keeping frames {split_frame + 1}-{max_frame}")
 
         # filter and re‐index gt
         df = df[df[0] > split_frame].copy()
@@ -89,38 +89,36 @@ def split_dataset(src_fldr: Path, percent_to_delete: float = 0.5) -> Tuple[Path,
     return dst_fldr, new_benchmark_name
 
 
-def convert_to_mot_format(
-    results: Union[Results, np.ndarray], frame_idx: int
-) -> np.ndarray:
-    """
-    Converts tracking results for a single frame into MOT challenge format.
+def convert_to_mot_format(results: Results | np.ndarray, frame_idx: int) -> np.ndarray:
+    """Converts tracking results for a single frame into MOT challenge format.
 
-    This function supports inputs as either a custom object with a 'boxes' attribute or a numpy array.
-    For custom object inputs, 'boxes' should contain 'id', 'xyxy', 'conf', and 'cls' sub-attributes.
-    For numpy array inputs, the expected format per row is: (xmin, ymin, xmax, ymax, id, conf, cls).
+    This function supports inputs as either a custom object with a 'boxes' attribute or a numpy array. For custom object
+    inputs, 'boxes' should contain 'id', 'xyxy', 'conf', and 'cls' sub-attributes. For numpy array inputs, the expected
+    format per row is: (xmin, ymin, xmax, ymax, id, conf, cls).
 
     Parameters:
     - results (Union[Results, np.ndarray]): Tracking results for the current frame.
     - frame_idx (int): The zero-based index of the frame being processed.
 
     Returns:
-    - np.ndarray: An array containing the MOT formatted results for the frame.
+            - np.ndarray: An array containing the MOT formatted results for the frame.
     """
-
     # Check if results are not empty
     if results.size != 0:
         if isinstance(results, np.ndarray):
             # Convert numpy array results to MOT format
             tlwh = ops.xyxy2ltwh(results[:, 0:4])
             frame_idx_column = np.full((results.shape[0], 1), frame_idx, dtype=np.int32)
-            mot_results = np.column_stack((
-                frame_idx_column, # frame index
-                results[:, 4].astype(np.int32),  # track id
-                tlwh.round().astype(np.int32),  # top,left,width,height
-                np.ones((results.shape[0], 1), dtype=np.int32),  # "not ignored"
-                results[:, 6].astype(np.int32) + 1,  # class
-                results[:, 5],  # confidence (float)
-            ))
+            mot_results = np.column_stack(
+                (
+                    frame_idx_column,  # frame index
+                    results[:, 4].astype(np.int32),  # track id
+                    tlwh.round().astype(np.int32),  # top,left,width,height
+                    np.ones((results.shape[0], 1), dtype=np.int32),  # "not ignored"
+                    results[:, 6].astype(np.int32) + 1,  # class
+                    results[:, 5],  # confidence (float)
+                )
+            )
             return mot_results
         else:
             # Convert ultralytics results to MOT format
@@ -128,28 +126,30 @@ def convert_to_mot_format(
             frame_indices = torch.full((num_detections, 1), frame_idx + 1, dtype=torch.int32)
             not_ignored = torch.ones((num_detections, 1), dtype=torch.int32)
 
-            mot_results = torch.cat([
-                frame_indices, # frame index
-                results.boxes.id.unsqueeze(1).astype(np.int32), # track id
-                ops.xyxy2ltwh(results.boxes.xyxy).astype(np.int32),  ## top,left,width,height
-                not_ignored, # "not ignored"
-                results.boxes.cls.unsqueeze(1).astype(np.int32) + 1, # class
-                results.boxes.conf.unsqueeze(1).astype(np.float32), # confidence (float)
-            ], dim=1)
+            mot_results = torch.cat(
+                [
+                    frame_indices,  # frame index
+                    results.boxes.id.unsqueeze(1).astype(np.int32),  # track id
+                    ops.xyxy2ltwh(results.boxes.xyxy).astype(np.int32),  ## top,left,width,height
+                    not_ignored,  # "not ignored"
+                    results.boxes.cls.unsqueeze(1).astype(np.int32) + 1,  # class
+                    results.boxes.conf.unsqueeze(1).astype(np.float32),  # confidence (float)
+                ],
+                dim=1,
+            )
 
             return mot_results.numpy()
 
 
 def write_mot_results(txt_path: Path, mot_results: np.ndarray) -> None:
-    """
-    Writes the MOT challenge formatted results to a text file.
+    """Writes the MOT challenge formatted results to a text file.
 
     Parameters:
     - txt_path (Path): The path to the text file where results are saved.
     - mot_results (np.ndarray): An array containing the MOT formatted results.
 
-    Note: The text file will be created if it does not exist, and the directory
-    path to the file will be created as well if necessary.
+    Note: The text file will be created if it does not exist, and the directory path to the file will be created as well
+    if necessary.
     """
     if mot_results is not None:
         # Ensure the parent directory of the txt_path exists
