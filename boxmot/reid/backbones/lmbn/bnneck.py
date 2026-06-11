@@ -5,7 +5,7 @@ from torch import nn
 
 class BNNeck(nn.Module):
     def __init__(self, input_dim, class_num, return_f=False):
-        super(BNNeck, self).__init__()
+        super().__init__()
         self.return_f = return_f
         self.bn = nn.BatchNorm1d(input_dim)
         self.bn.bias.requires_grad_(False)
@@ -48,7 +48,7 @@ class BNNeck(nn.Module):
 
 class BNNeck3(nn.Module):
     def __init__(self, input_dim, class_num, feat_dim, return_f=False):
-        super(BNNeck3, self).__init__()
+        super().__init__()
         self.return_f = return_f
         # self.reduction = nn.Linear(input_dim, feat_dim)
         # self.bn = nn.BatchNorm1d(feat_dim)
@@ -112,7 +112,7 @@ class ClassBlock(nn.Module):
         linear=True,
         return_f=False,
     ):
-        super(ClassBlock, self).__init__()
+        super().__init__()
         self.return_f = return_f
         add_block = []
         if linear:

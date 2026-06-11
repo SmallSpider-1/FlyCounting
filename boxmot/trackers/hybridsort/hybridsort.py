@@ -6,9 +6,10 @@
 # - Emits rows: [x1,y1,x2,y2, track_id, conf, cls, det_ind]
 # - Safe with COCO 80 classes; preserves det_ind; guards out-of-range indices
 
+from __future__ import annotations
+
 from collections import deque
 from pathlib import Path
-from typing import List, Optional, Union
 
 import numpy as np
 import torch
@@ -16,11 +17,21 @@ import torch
 from boxmot.motion.cmc import get_cmc_method
 from boxmot.reid.core.auto_backend import ReidAutoBackend
 from boxmot.trackers.basetracker import BaseTracker
+
 # Keep your original association functions:
 from boxmot.trackers.hybridsort.association import (
-    associate_4_points_with_score, associate_4_points_with_score_with_reid,
-    cal_score_dif_batch_two_score, ciou_batch, ct_dist, diou_batch,
-    embedding_distance, giou_batch, hmiou, iou_batch, linear_assignment)
+    associate_4_points_with_score,
+    associate_4_points_with_score_with_reid,
+    cal_score_dif_batch_two_score,
+    ciou_batch,
+    ct_dist,
+    diou_batch,
+    embedding_distance,
+    giou_batch,
+    hmiou,
+    iou_batch,
+    linear_assignment,
+)
 
 
 def k_previous_obs(observations, cur_age, k):
@@ -92,10 +103,9 @@ def speed_direction_rb(bbox1, bbox2):
     return speed / norm
 
 
-class KalmanBoxTracker(object):
-    """
-    Single-object tracker with 9D custom KF (u,v,s,c,r, du,dv,ds,dc) by default.
-    Stores `cls` and `det_ind` metadata from the most recent matched detection.
+class KalmanBoxTracker:
+    """Single-object tracker with 9D custom KF (u,v,s,c,r, du,dv,ds,dc) by default. Stores `cls` and `det_ind` metadata
+    from the most recent matched detection.
     """
 
     count = 0
@@ -115,8 +125,8 @@ class KalmanBoxTracker(object):
         det_ind: int = -1,
     ):
         if use_custom_kf:
-            from .kalmanfilter_score_new import \
-                KalmanFilterNew_score_new as KalmanFilter_score_new
+            from .kalmanfilter_score_new import KalmanFilterNew_score_new as KalmanFilter_score_new
+
             self.kf = KalmanFilter_score_new(dim_x=9, dim_z=5)
             self.kf.F = np.array(
                 [
@@ -149,6 +159,7 @@ class KalmanBoxTracker(object):
             self.kf.x[:5] = convert_bbox_to_z(bbox)
         else:
             from filterpy.kalman import KalmanFilter
+
             self.kf = KalmanFilter(dim_x=7, dim_z=4)
             self.kf.F = np.array(
                 [
@@ -178,7 +189,7 @@ class KalmanBoxTracker(object):
         self.time_since_update = 0
         self.id = KalmanBoxTracker.count
         KalmanBoxTracker.count += 1
-        self.history: List[np.ndarray] = []
+        self.history: list[np.ndarray] = []
         self.hits = 0
         self.hit_streak = 0
         self.age = 0
@@ -187,7 +198,7 @@ class KalmanBoxTracker(object):
         self.last_observation = np.array([-1, -1, -1, -1, -1])
         self.last_observation_save = np.array([-1, -1, -1, -1, -1])
         self.observations = dict()
-        self.history_observations: List[np.ndarray] = []
+        self.history_observations: list[np.ndarray] = []
 
         # velocity aids
         self.velocity_lt = None
@@ -202,7 +213,7 @@ class KalmanBoxTracker(object):
 
         # ReID buffers
         self.smooth_feat = None
-        self.features = deque([], maxlen=int(longterm_bank_length))
+        self.features = deque(maxlen=int(longterm_bank_length))
         self.alpha = float(alpha)
         self.adapfs = bool(adapfs)
         self.track_thresh = float(track_thresh)
@@ -259,7 +270,9 @@ class KalmanBoxTracker(object):
         # write back to KF (keep score)
         self.kf.x[:5] = convert_bbox_to_z([x1_, y1_, x2_, y2_, float(score)])
 
-    def update(self, bbox, id_feature, update_feature: bool = True, *, cls: Optional[int] = None, det_ind: Optional[int] = None):
+    def update(
+        self, bbox, id_feature, update_feature: bool = True, *, cls: int | None = None, det_ind: int | None = None
+    ):
         vlt = vrt = vlb = vrb = None
         if bbox is not None:
             if self.last_observation.sum() >= 0:
@@ -334,11 +347,13 @@ class KalmanBoxTracker(object):
         if not self.confidence_pre:
             simple_score = float(np.clip(self.conf, 0.1, self.track_thresh))
         else:
-            simple_score = float(np.clip(
-                self.conf - (self.confidence_pre - self.conf),
-                0.1,
-                self.track_thresh,
-            ))
+            simple_score = float(
+                np.clip(
+                    self.conf - (self.confidence_pre - self.conf),
+                    0.1,
+                    self.track_thresh,
+                )
+            )
 
         return self.history[-1], kalman_score, simple_score
 
@@ -354,8 +369,7 @@ ASSO_FUNCS = {
 
 
 class HybridSort(BaseTracker):
-    """
-    Hybrid SORT + ReID with ECC CMC
+    """Hybrid SORT + ReID with ECC CMC.
 
     - Explicit configuration only (no self.args)
     - ReID model and ECC setup like BotSort
@@ -367,49 +381,43 @@ class HybridSort(BaseTracker):
     def __init__(
         self,
         # ReID & CMC
-        reid_weights: Optional[Union[Path, str]],
+        reid_weights: Path | str | None,
         device: torch.device,
         half: bool,
         cmc_method: str = "ecc",
         with_reid: bool = True,
-
         # Hybrid-SORT specific
         low_thresh: float = 0.1,
         delta_t: int = 3,
         inertia: float = 0.05,
         use_byte: bool = True,
-
         # KF / ReID
         use_custom_kf: bool = True,
         longterm_bank_length: int = 30,
         alpha: float = 0.9,
         adapfs: bool = False,
         track_thresh: float = 0.5,
-
         # Embedding-guided association
         EG_weight_high_score: float = 4.6,
         EG_weight_low_score: float = 1.3,
-
         # Two-step toggles / thresholds
         TCM_first_step: bool = True,
         TCM_byte_step: bool = True,
         TCM_byte_step_weight: float = 1.0,
         high_score_matching_thresh: float = 0.7,
-
         # Long-term reid
         with_longterm_reid: bool = True,
         longterm_reid_weight: float = 0.0,
         with_longterm_reid_correction: bool = True,
         longterm_reid_correction_thresh: float = 0.4,
         longterm_reid_correction_thresh_low: float = 0.4,
-
         # misc
         dataset: str = "",
         **kwargs,  # BaseTracker parameters
     ):
         # Capture all init params for logging
-        init_args = {k: v for k, v in locals().items() if k not in ('self', 'kwargs')}
-        super().__init__(**init_args, _tracker_name='HybridSort', **kwargs)
+        init_args = {k: v for k, v in locals().items() if k not in ("self", "kwargs")}
+        super().__init__(**init_args, _tracker_name="HybridSort", **kwargs)
 
         # store core knobs
         self.low_thresh = float(low_thresh)
@@ -447,17 +455,15 @@ class HybridSort(BaseTracker):
         self.cmc = get_cmc_method(cmc_method)()
 
         # container
-        self.active_tracks: List[KalmanBoxTracker] = []
+        self.active_tracks: list[KalmanBoxTracker] = []
         KalmanBoxTracker.count = 0
 
     @BaseTracker.setup_decorator
     @BaseTracker.per_class_decorator
     def update(self, dets: np.ndarray, img: np.ndarray, embs: np.ndarray = None) -> np.ndarray:
-        """
-        dets: ndarray [N,6] -> [x1,y1,x2,y2,conf,cls]
-        img: HxWxC image
-        embs: optional [N,D] appearance features. If None and with_reid=True, we extract features for provided dets.
-        Returns: ndarray [M,8]: [x1,y1,x2,y2,track_id,conf,cls,det_ind]
+        """dets: ndarray [N,6] -> [x1,y1,x2,y2,conf,cls] img: HxWxC image embs: optional [N,D] appearance features. If
+        None and with_reid=True, we extract features for provided dets. Returns: ndarray
+        [M,8]: [x1,y1,x2,y2,track_id,conf,cls,det_ind].
         """
         self.check_inputs(dets, img, embs)
         self.frame_count += 1
@@ -507,7 +513,7 @@ class HybridSort(BaseTracker):
         inds_high = confs < self.det_thresh
         inds_second = np.logical_and(inds_low, inds_high)
 
-        dets_second = dets_idx[inds_second]         # low-conf for BYTE
+        dets_second = dets_idx[inds_second]  # low-conf for BYTE
         remain_inds = confs > self.det_thresh
         dets_keep = dets_idx[remain_inds]
 
@@ -545,10 +551,18 @@ class HybridSort(BaseTracker):
             self.active_tracks.pop(t)
 
         # Prepare motion cues
-        velocities_lt = np.array([t.velocity_lt if t.velocity_lt is not None else np.array((0, 0)) for t in self.active_tracks])
-        velocities_rt = np.array([t.velocity_rt if t.velocity_rt is not None else np.array((0, 0)) for t in self.active_tracks])
-        velocities_lb = np.array([t.velocity_lb if t.velocity_lb is not None else np.array((0, 0)) for t in self.active_tracks])
-        velocities_rb = np.array([t.velocity_rb if t.velocity_rb is not None else np.array((0, 0)) for t in self.active_tracks])
+        velocities_lt = np.array(
+            [t.velocity_lt if t.velocity_lt is not None else np.array((0, 0)) for t in self.active_tracks]
+        )
+        velocities_rt = np.array(
+            [t.velocity_rt if t.velocity_rt is not None else np.array((0, 0)) for t in self.active_tracks]
+        )
+        velocities_lb = np.array(
+            [t.velocity_lb if t.velocity_lb is not None else np.array((0, 0)) for t in self.active_tracks]
+        )
+        velocities_rb = np.array(
+            [t.velocity_rb if t.velocity_rb is not None else np.array((0, 0)) for t in self.active_tracks]
+        )
         last_boxes = np.array([t.last_observation for t in self.active_tracks])
         k_observations = np.array([k_previous_obs(t.observations, t.age, self.delta_t) for t in self.active_tracks])
 
@@ -560,7 +574,10 @@ class HybridSort(BaseTracker):
             long_emb_dists = None
             if self.with_longterm_reid or self.with_longterm_reid_correction:
                 long_track_features = np.asarray(
-                    [np.vstack(list(t.features)).mean(0) if len(t.features) else t.smooth_feat for t in self.active_tracks],
+                    [
+                        np.vstack(list(t.features)).mean(0) if len(t.features) else t.smooth_feat
+                        for t in self.active_tracks
+                    ],
                     dtype=float,
                 )
                 long_emb_dists = embedding_distance(long_track_features, id_feature_keep).T
@@ -584,7 +601,7 @@ class HybridSort(BaseTracker):
                 longterm_reid_weight=self.longterm_reid_weight,
                 with_longterm_reid_correction=self.with_longterm_reid_correction,
                 longterm_reid_correction_thresh=self.longterm_reid_correction_thresh,
-                dataset=self.per_class and "perclass" or self.dataset,
+                dataset=(self.per_class and "perclass") or self.dataset,
             )
         elif self.TCM_first_step and len(dets_first) and len(trks):
             matched, unmatched_dets, unmatched_trks = associate_4_points_with_score(
@@ -635,7 +652,10 @@ class HybridSort(BaseTracker):
                     det_rel, trk_rel = mm[0], mm[1]
                     trk_ind = unmatched_trks[trk_rel]
                     if self.with_longterm_reid_correction and self.EG_weight_low_score > 0 and self.with_reid:
-                        if iou_left_thre[det_rel, trk_rel] < self.iou_threshold or emb_dists_low[det_rel, trk_rel] > self.longterm_reid_correction_thresh_low:
+                        if (
+                            iou_left_thre[det_rel, trk_rel] < self.iou_threshold
+                            or emb_dists_low[det_rel, trk_rel] > self.longterm_reid_correction_thresh_low
+                        ):
                             continue
                     else:
                         if iou_left_thre[det_rel, trk_rel] < self.iou_threshold:
@@ -708,13 +728,15 @@ class HybridSort(BaseTracker):
 
             # Only output fresh tracks and valid det_ind for this frame
             if (trk.time_since_update < 1) and (trk.hit_streak >= self.min_hits or self.frame_count <= self.min_hits):
-                outputs.append([
-                    *d.tolist(),
-                    trk.id + 1,                 # track id
-                    float(trk.conf),      # conf
-                    int(trk.cls),               # cls (from detection)
-                    int(trk.det_ind),           # det index (frame-local)
-                ])
+                outputs.append(
+                    [
+                        *d.tolist(),
+                        trk.id + 1,  # track id
+                        float(trk.conf),  # conf
+                        int(trk.cls),  # cls (from detection)
+                        int(trk.det_ind),  # det index (frame-local)
+                    ]
+                )
 
         # Remove dead tracks
         i = len(self.active_tracks)

@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Tuple, Union
 
 import torch
 
@@ -22,11 +23,11 @@ class ReidAutoBackend:
         device: torch.device = torch.device("cpu"),
         half: bool = False,
     ) -> None:
-        """
-        Initializes the ReidAutoBackend instance with specified weights, device, and precision mode.
+        """Initializes the ReidAutoBackend instance with specified weights, device, and precision mode.
 
         Args:
-            weights (Union[str, List[str]]): Path to the model weights. Can be a string or a list of strings; if a list, the first element is used.
+            weights (Union[str, List[str]]): Path to the model weights. Can be a string or a list of strings; if a list,
+                the first element is used.
             device (torch.device): The device to run the model on, e.g., CPU or GPU.
             half (bool): Whether to use half precision for model inference.
         """
@@ -48,16 +49,8 @@ class ReidAutoBackend:
 
     def get_backend(
         self,
-    ) -> Union[
-        "PyTorchBackend",
-        "TorchscriptBackend",
-        "ONNXBackend",
-        "TensorRTBackend",
-        "OpenVinoBackend",
-        "TFLiteBackend",
-    ]:
-        """
-        Returns an instance of the appropriate backend based on the model type.
+    ) -> PyTorchBackend | TorchscriptBackend | ONNXBackend | TensorRTBackend | OpenVinoBackend | TFLiteBackend:
+        """Returns an instance of the appropriate backend based on the model type.
 
         Returns:
             An instance of a backend class corresponding to the detected model type.
@@ -65,7 +58,6 @@ class ReidAutoBackend:
         Raises:
             SystemExit: If no supported model framework is detected.
         """
-
         # Mapping of conditions to backend constructors
         backend_map = {
             self.pt: PyTorchBackend,
@@ -88,31 +80,26 @@ class ReidAutoBackend:
     def check_suffix(
         self,
         file: Path = "osnet_x0_25_msmt17.pt",
-        suffix: Union[str, Tuple[str, ...]] = (".pt",),
+        suffix: str | tuple[str, ...] = (".pt",),
         msg: str = "",
     ) -> None:
-        """
-        Validates that the file or files have an acceptable suffix.
+        """Validates that the file or files have an acceptable suffix.
 
         Args:
             file (Union[str, List[str], Path]): The file or files to check.
             suffix (Union[str, Tuple[str, ...]]): Acceptable suffix or suffixes.
             msg (str): Additional message to log in case of an error.
         """
-
         suffix = [suffix] if isinstance(suffix, str) else list(suffix)
         files = [file] if isinstance(file, (str, Path)) else list(file)
 
         for f in files:
             file_suffix = Path(f).suffix.lower()
             if file_suffix and file_suffix not in suffix:
-                LOGGER.error(
-                    f"File {f} does not have an acceptable suffix. Expected: {suffix}"
-                )
+                LOGGER.error(f"File {f} does not have an acceptable suffix. Expected: {suffix}")
 
-    def model_type(self, p: Path) -> Tuple[bool, ...]:
-        """
-        Determines the model type based on the file's suffix.
+    def model_type(self, p: Path) -> tuple[bool, ...]:
+        """Determines the model type based on the file's suffix.
 
         Args:
             path (str): The file path to the model.
@@ -120,18 +107,17 @@ class ReidAutoBackend:
         Returns:
             Tuple[bool, ...]: A tuple of booleans indicating the model type, corresponding to pt, jit, onnx, xml, engine, and tflite.
         """
-
         sf = list(export_formats().Suffix)  # export suffixes
         self.check_suffix(p, sf)  # checks
         types = [s in Path(p).name for s in sf]
-        
+
         # Explicitly check for OpenVINO extensions (xml, bin)
-        if Path(p).suffix in ['.xml', '.bin']:
+        if Path(p).suffix in [".xml", ".bin"]:
             # Find index of OpenVINO suffix
             try:
-                ov_idx = sf.index('_openvino_model')
+                ov_idx = sf.index("_openvino_model")
                 types[ov_idx] = True
             except ValueError:
                 pass
-        
+
         return types
