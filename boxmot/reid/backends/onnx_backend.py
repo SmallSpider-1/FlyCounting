@@ -2,7 +2,6 @@ from boxmot.reid.backends.base_backend import BaseModelBackend
 
 
 class ONNXBackend(BaseModelBackend):
-
     def __init__(self, weights, device, half):
         super().__init__(weights, device, half)
         self.nhwc = False

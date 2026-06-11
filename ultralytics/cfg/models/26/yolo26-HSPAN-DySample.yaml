@@ -32,7 +32,7 @@ backbone:
 head:
   - [-1, 1, ChannelAttention_HSFPN, []] # 11
   - [-1, 1, nn.Conv2d, [256, 1]] # 12
-  - [-1, 1, DySample, [2, 'lp']] # 13
+  - [-1, 1, DySample, [2, "lp"]] # 13
 
   - [6, 1, ChannelAttention_HSFPN, []] # 14
   - [-1, 1, nn.Conv2d, [256, 1]] # 15
@@ -41,7 +41,7 @@ head:
   - [[-1, 13], 1, Add, []] # 18
   - [-1, 2, C3k2, [256, False]] # 19 P4/16
 
-  - [13, 1, DySample, [2, 'lp']] # 20
+  - [13, 1, DySample, [2, "lp"]] # 20
   - [4, 1, ChannelAttention_HSFPN, []] # 21
   - [-1, 1, nn.Conv2d, [256, 1]] # 22
   - [20, 1, ChannelAttention_HSFPN, [4, False]] # 23

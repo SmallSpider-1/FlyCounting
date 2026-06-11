@@ -37,9 +37,8 @@ def default_imgsz(yolo_name):
 
 
 def get_yolo_inferer(yolo_model):
-    """
-    Determines and returns the appropriate inference strategy class based on the model name.
-    Handles dependency checks and imports dynamically.
+    """Determines and returns the appropriate inference strategy class based on the model name. Handles dependency
+    checks and imports dynamically.
     """
     model_name = str(yolo_model)
 
@@ -91,4 +90,3 @@ def get_yolo_inferer(yolo_model):
         "For custom models, the filename must include one of these substrings to route it to the correct package and architecture."
     )
     exit()
-

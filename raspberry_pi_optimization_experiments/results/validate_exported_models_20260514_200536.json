@@ -22,18 +22,10 @@
           "postprocess": 0.6581626524040745
         },
         "save_dir": "/home/admin1/Projects/ultralytics-main/raspberry_pi_optimization_experiments/results/val_exported_models/yolo26n_ncnn_1_20260514_200356_ncnn_model",
-        "class_precision": [
-          0.9758489226174984
-        ],
-        "class_recall": [
-          0.9820914178333737
-        ],
-        "class_map50": [
-          0.9923536892326942
-        ],
-        "class_map50_95": [
-          0.8518274808741572
-        ]
+        "class_precision": [0.9758489226174984],
+        "class_recall": [0.9820914178333737],
+        "class_map50": [0.9923536892326942],
+        "class_map50_95": [0.8518274808741572]
       }
     }
   ]

@@ -6,9 +6,13 @@ from common import EXPORTS_DIR, RESULTS_DIR, collect_val_metrics, load_config, t
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Validate exported YOLO artifacts from the workspace exports directory.")
+    parser = argparse.ArgumentParser(
+        description="Validate exported YOLO artifacts from the workspace exports directory."
+    )
     parser.add_argument("--config", type=Path, default=None, help="Experiment matrix JSON.")
-    parser.add_argument("--artifacts", nargs="*", type=Path, default=None, help="Specific exported model files/directories.")
+    parser.add_argument(
+        "--artifacts", nargs="*", type=Path, default=None, help="Specific exported model files/directories."
+    )
     parser.add_argument("--imgsz", type=int, default=640, help="Image size.")
     parser.add_argument("--device", default=None, help="Device, e.g. cpu or 0.")
     parser.add_argument("--batch", type=int, default=None, help="Batch size.")

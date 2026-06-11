@@ -1,14 +1,29 @@
 # Based on this: https://github.com/Khochawongwat/GRAMKAN/blob/main/model.py
 from functools import lru_cache
+
 import torch
 import torch.nn as nn
-from torch.nn.functional import conv3d, conv2d, conv1d
+from torch.nn.functional import conv1d, conv2d, conv3d
 
 
 class KAGNConvNDLayer(nn.Module):
-    def __init__(self, conv_class, norm_class, conv_w_fun, input_dim, output_dim, degree, kernel_size,
-                 groups=1, padding=0, stride=1, dilation=1, dropout: float = 0.0, ndim: int = 2):
-        super(KAGNConvNDLayer, self).__init__()
+    def __init__(
+        self,
+        conv_class,
+        norm_class,
+        conv_w_fun,
+        input_dim,
+        output_dim,
+        degree,
+        kernel_size,
+        groups=1,
+        padding=0,
+        stride=1,
+        dilation=1,
+        dropout: float = 0.0,
+        ndim: int = 2,
+    ):
+        super().__init__()
         self.inputdim = input_dim
         self.outdim = output_dim
         self.degree = degree
@@ -30,44 +45,53 @@ class KAGNConvNDLayer(nn.Module):
                 self.dropout = nn.Dropout3d(p=dropout)
 
         if groups <= 0:
-            raise ValueError('groups must be a positive integer')
+            raise ValueError("groups must be a positive integer")
         if input_dim % groups != 0:
-            raise ValueError('input_dim must be divisible by groups')
+            raise ValueError("input_dim must be divisible by groups")
         if output_dim % groups != 0:
-            raise ValueError('output_dim must be divisible by groups')
+            raise ValueError("output_dim must be divisible by groups")
 
-        self.base_conv = nn.ModuleList([conv_class(input_dim // groups,
-                                                   output_dim // groups,
-                                                   kernel_size,
-                                                   stride,
-                                                   padding,
-                                                   dilation,
-                                                   groups=1,
-                                                   bias=False) for _ in range(groups)])
+        self.base_conv = nn.ModuleList(
+            [
+                conv_class(
+                    input_dim // groups,
+                    output_dim // groups,
+                    kernel_size,
+                    stride,
+                    padding,
+                    dilation,
+                    groups=1,
+                    bias=False,
+                )
+                for _ in range(groups)
+            ]
+        )
 
         self.layer_norm = nn.ModuleList([norm_class(output_dim // groups) for _ in range(groups)])
 
-        poly_shape = (groups, output_dim // groups, (input_dim // groups) * (degree + 1)) + tuple(
-            kernel_size for _ in range(ndim))
+        poly_shape = (
+            groups,
+            output_dim // groups,
+            input_dim // groups * (degree + 1),
+            *tuple(kernel_size for _ in range(ndim)),
+        )
 
         self.poly_weights = nn.Parameter(torch.randn(*poly_shape))
         self.beta_weights = nn.Parameter(torch.zeros(degree + 1, dtype=torch.float32))
 
         # Initialize weights using Kaiming uniform distribution for better training start
         for conv_layer in self.base_conv:
-            nn.init.kaiming_uniform_(conv_layer.weight, nonlinearity='linear')
+            nn.init.kaiming_uniform_(conv_layer.weight, nonlinearity="linear")
 
-        nn.init.kaiming_uniform_(self.poly_weights, nonlinearity='linear')
+        nn.init.kaiming_uniform_(self.poly_weights, nonlinearity="linear")
         nn.init.normal_(
             self.beta_weights,
             mean=0.0,
-            std=1.0 / ((kernel_size ** ndim) * self.inputdim * (self.degree + 1.0)),
+            std=1.0 / ((kernel_size**ndim) * self.inputdim * (self.degree + 1.0)),
         )
 
     def beta(self, n, m):
-        return (
-                       ((m + n) * (m - n) * n ** 2) / (m ** 2 / (4.0 * n ** 2 - 1.0))
-               ) * self.beta_weights[n]
+        return (((m + n) * (m - n) * n**2) / (m**2 / (4.0 * n**2 - 1.0))) * self.beta_weights[n]
 
     @lru_cache(maxsize=128)  # Cache to avoid recomputation of Legendre polynomials
     def gram_poly(self, x, degree):
@@ -104,9 +128,14 @@ class KAGNConvNDLayer(nn.Module):
         #     "b l d, l o d -> b o",
         # )
 
-        y = self.conv_w_fun(grams_basis, self.poly_weights[group_index],
-                            stride=self.stride, dilation=self.dilation,
-                            padding=self.padding, groups=1)
+        y = self.conv_w_fun(
+            grams_basis,
+            self.poly_weights[group_index],
+            stride=self.stride,
+            dilation=self.dilation,
+            padding=self.padding,
+            groups=1,
+        )
 
         y = self.base_activation(self.layer_norm[group_index](y + basis))
 
@@ -125,30 +154,91 @@ class KAGNConvNDLayer(nn.Module):
 
 
 class KAGNConv3DLayer(KAGNConvNDLayer):
-    def __init__(self, input_dim, output_dim, kernel_size, degree=3, groups=1, padding=0, stride=1, dilation=1,
-                 dropout: float = 0.0):
-        super(KAGNConv3DLayer, self).__init__(nn.Conv3d, nn.InstanceNorm3d, conv3d,
-                                              input_dim, output_dim,
-                                              degree, kernel_size,
-                                              groups=groups, padding=padding, stride=stride, dilation=dilation,
-                                              ndim=3, dropout=dropout)
+    def __init__(
+        self,
+        input_dim,
+        output_dim,
+        kernel_size,
+        degree=3,
+        groups=1,
+        padding=0,
+        stride=1,
+        dilation=1,
+        dropout: float = 0.0,
+    ):
+        super().__init__(
+            nn.Conv3d,
+            nn.InstanceNorm3d,
+            conv3d,
+            input_dim,
+            output_dim,
+            degree,
+            kernel_size,
+            groups=groups,
+            padding=padding,
+            stride=stride,
+            dilation=dilation,
+            ndim=3,
+            dropout=dropout,
+        )
 
 
 class KAGNConv2DLayer(KAGNConvNDLayer):
-    def __init__(self, input_dim, output_dim, kernel_size, degree=3, groups=1, padding=0, stride=1, dilation=1,
-                 dropout: float = 0.0, norm_layer=nn.InstanceNorm2d):
-        super(KAGNConv2DLayer, self).__init__(nn.Conv2d, norm_layer, conv2d,
-                                              input_dim, output_dim,
-                                              degree, kernel_size,
-                                              groups=groups, padding=padding, stride=stride, dilation=dilation,
-                                              ndim=2, dropout=dropout)
+    def __init__(
+        self,
+        input_dim,
+        output_dim,
+        kernel_size,
+        degree=3,
+        groups=1,
+        padding=0,
+        stride=1,
+        dilation=1,
+        dropout: float = 0.0,
+        norm_layer=nn.InstanceNorm2d,
+    ):
+        super().__init__(
+            nn.Conv2d,
+            norm_layer,
+            conv2d,
+            input_dim,
+            output_dim,
+            degree,
+            kernel_size,
+            groups=groups,
+            padding=padding,
+            stride=stride,
+            dilation=dilation,
+            ndim=2,
+            dropout=dropout,
+        )
 
 
 class KAGNConv1DLayer(KAGNConvNDLayer):
-    def __init__(self, input_dim, output_dim, kernel_size, degree=3, groups=1, padding=0, stride=1, dilation=1,
-                 dropout: float = 0.0):
-        super(KAGNConv1DLayer, self).__init__(nn.Conv1d, nn.InstanceNorm1d, conv1d,
-                                              input_dim, output_dim,
-                                              degree, kernel_size,
-                                              groups=groups, padding=padding, stride=stride, dilation=dilation,
-                                              ndim=1, dropout=dropout)
+    def __init__(
+        self,
+        input_dim,
+        output_dim,
+        kernel_size,
+        degree=3,
+        groups=1,
+        padding=0,
+        stride=1,
+        dilation=1,
+        dropout: float = 0.0,
+    ):
+        super().__init__(
+            nn.Conv1d,
+            nn.InstanceNorm1d,
+            conv1d,
+            input_dim,
+            output_dim,
+            degree,
+            kernel_size,
+            groups=groups,
+            padding=padding,
+            stride=stride,
+            dilation=dilation,
+            ndim=1,
+            dropout=dropout,
+        )
