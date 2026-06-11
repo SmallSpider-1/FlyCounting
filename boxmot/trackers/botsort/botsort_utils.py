@@ -1,15 +1,13 @@
 # Mikel Broström 🔥 BoxMOT 🧾 AGPL-3.0 license
 
-from typing import List, Tuple
 
 import numpy as np
 
 from boxmot.utils.matching import iou_distance
 
 
-def joint_stracks(tlista: List["STrack"], tlistb: List["STrack"]) -> List["STrack"]:
-    """
-    Joins two lists of tracks, ensuring that there are no duplicates based on track IDs.
+def joint_stracks(tlista: list["STrack"], tlistb: list["STrack"]) -> list["STrack"]:
+    """Joins two lists of tracks, ensuring that there are no duplicates based on track IDs.
 
     Args:
         tlista (List[STrack]): The first list of tracks.
@@ -31,9 +29,8 @@ def joint_stracks(tlista: List["STrack"], tlistb: List["STrack"]) -> List["STrac
     return res
 
 
-def sub_stracks(tlista: List["STrack"], tlistb: List["STrack"]) -> List["STrack"]:
-    """
-    Subtracts the tracks in tlistb from tlista based on track IDs.
+def sub_stracks(tlista: list["STrack"], tlistb: list["STrack"]) -> list["STrack"]:
+    """Subtracts the tracks in tlistb from tlista based on track IDs.
 
     Args:
         tlista (List[STrack]): The list of tracks from which tracks will be removed.
@@ -45,16 +42,14 @@ def sub_stracks(tlista: List["STrack"], tlistb: List["STrack"]) -> List["STrack"
     stracks = {t.id: t for t in tlista}
     for t in tlistb:
         tid = t.id
-        if tid in stracks:
-            del stracks[tid]
+        stracks.pop(tid, None)
     return list(stracks.values())
 
 
 def remove_duplicate_stracks(
-    stracksa: List["STrack"], stracksb: List["STrack"]
-) -> Tuple[List["STrack"], List["STrack"]]:
-    """
-    Removes duplicate tracks between two lists based on their IoU distance and track duration.
+    stracksa: list["STrack"], stracksb: list["STrack"]
+) -> tuple[list["STrack"], list["STrack"]]:
+    """Removes duplicate tracks between two lists based on their IoU distance and track duration.
 
     Args:
         stracksa (List[STrack]): The first list of tracks.

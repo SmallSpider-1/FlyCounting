@@ -1,17 +1,19 @@
 import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from einops import rearrange, repeat
+from einops import repeat
 from timm.layers import to_2tuple
 from torch.nn.init import trunc_normal_
 
 try:
     from mamba_ssm.ops.selective_scan_interface import selective_scan_fn
-except Exception as e:
+except Exception:
     pass
 
-__all__ = ['AttentiveLayer']
+__all__ = ["AttentiveLayer"]
+
 
 def index_reverse(index):
     index_r = torch.zeros_like(index)
@@ -23,7 +25,7 @@ def index_reverse(index):
 
 def semantic_neighbor(x, index):
     dim = index.dim()
-    assert x.shape[:dim] == index.shape, "x ({:}) and index ({:}) shape incompatible".format(x.shape, index.shape)
+    assert x.shape[:dim] == index.shape, f"x ({x.shape}) and index ({index.shape}) shape incompatible"
 
     for _ in range(x.dim() - index.dim()):
         index = index.unsqueeze(-1)
@@ -32,11 +34,12 @@ def semantic_neighbor(x, index):
     shuffled_x = torch.gather(x, dim=dim - 1, index=index)
     return shuffled_x
 
+
 def window_partition(x, window_size):
     """
     Args:
         x: (b, h, w, c)
-        window_size (int): window size
+        window_size (int): window size.
 
     Returns:
         windows: (num_windows*b, window_size, window_size, c)
@@ -53,7 +56,7 @@ def window_reverse(windows, window_size, h, w):
         windows: (num_windows*b, window_size, window_size, c)
         window_size (int): Window size
         h (int): Height of image
-        w (int): Width of image
+        w (int): Width of image.
 
     Returns:
         x: (b, h, w, c)
@@ -63,6 +66,7 @@ def window_reverse(windows, window_size, h, w):
     x = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(b, h, w, -1)
     return x
 
+
 class Gate(nn.Module):
     def __init__(self, dim):
         super().__init__()
@@ -71,15 +75,19 @@ class Gate(nn.Module):
 
     def forward(self, x, H, W):
         x1, x2 = x.chunk(2, dim=-1)
-        B, N, C = x.shape
-        x2 = self.conv(self.norm(x2).transpose(1, 2).contiguous().view(B, C // 2, H, W)).flatten(2).transpose(-1,
-                                                                                                              -2).contiguous()
+        B, _N, C = x.shape
+        x2 = (
+            self.conv(self.norm(x2).transpose(1, 2).contiguous().view(B, C // 2, H, W))
+            .flatten(2)
+            .transpose(-1, -2)
+            .contiguous()
+        )
 
         return x1 * x2
 
 
 class GatedMLP(nn.Module):
-    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
+    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.0):
         super().__init__()
         out_features = out_features or in_features
         hidden_features = hidden_features or in_features
@@ -90,9 +98,7 @@ class GatedMLP(nn.Module):
         self.drop = nn.Dropout(drop)
 
     def forward(self, x, x_size):
-        """
-        Input: x: (B, H*W, C), H, W
-        Output: x: (B, H*W, C)
+        """Input: x: (B, H*W, C), H, W Output: x: (B, H*W, C).
         """
         H, W = x_size
         x = self.fc1(x)
@@ -106,8 +112,9 @@ class GatedMLP(nn.Module):
         x = self.drop(x)
         return x
 
+
 class ASSM(nn.Module):
-    def __init__(self, dim, d_state, num_tokens=64, inner_rank=128, mlp_ratio=2.):
+    def __init__(self, dim, d_state, num_tokens=64, inner_rank=128, mlp_ratio=2.0):
         super().__init__()
         self.dim = dim
         self.num_tokens = num_tokens
@@ -137,7 +144,7 @@ class ASSM(nn.Module):
             nn.Linear(self.dim, self.dim // 3),
             nn.GELU(),
             nn.Linear(self.dim // 3, self.num_tokens),
-            nn.LogSoftmax(dim=-1)
+            nn.LogSoftmax(dim=-1),
         )
 
     def forward(self, x, x_size, token):
@@ -152,7 +159,7 @@ class ASSM(nn.Module):
         prompt = torch.matmul(cls_policy, full_embedding).view(B, n, self.d_state)
 
         detached_index = torch.argmax(cls_policy.detach(), dim=-1, keepdim=False).view(B, n)  # [B, HW]
-        x_sort_values, x_sort_indices = torch.sort(detached_index, dim=-1, stable=False)
+        _x_sort_values, x_sort_indices = torch.sort(detached_index, dim=-1, stable=False)
         x_sort_indices_reverse = index_reverse(x_sort_indices)
 
         x = x.permute(0, 2, 1).reshape(B, C, H, W).contiguous()
@@ -171,19 +178,19 @@ class ASSM(nn.Module):
 
 class Selective_Scan(nn.Module):
     def __init__(
-            self,
-            d_model,
-            d_state=16,
-            expand=2.,
-            dt_rank="auto",
-            dt_min=0.001,
-            dt_max=0.1,
-            dt_init="random",
-            dt_scale=1.0,
-            dt_init_floor=1e-4,
-            device=None,
-            dtype=None,
-            **kwargs,
+        self,
+        d_model,
+        d_state=16,
+        expand=2.0,
+        dt_rank="auto",
+        dt_min=0.001,
+        dt_max=0.1,
+        dt_init="random",
+        dt_scale=1.0,
+        dt_init_floor=1e-4,
+        device=None,
+        dtype=None,
+        **kwargs,
     ):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
@@ -193,15 +200,14 @@ class Selective_Scan(nn.Module):
         self.d_inner = int(self.expand * self.d_model)
         self.dt_rank = math.ceil(self.d_model / 16) if dt_rank == "auto" else dt_rank
 
-        self.x_proj = (
-            nn.Linear(self.d_inner, (self.dt_rank + self.d_state * 2), bias=False, **factory_kwargs),
-        )
+        self.x_proj = (nn.Linear(self.d_inner, (self.dt_rank + self.d_state * 2), bias=False, **factory_kwargs),)
         self.x_proj_weight = nn.Parameter(torch.stack([t.weight for t in self.x_proj], dim=0))  # (K=4, N, inner)
         del self.x_proj
 
         self.dt_projs = (
-            self.dt_init(self.dt_rank, self.d_inner, dt_scale, dt_init, dt_min, dt_max, dt_init_floor,
-                         **factory_kwargs),
+            self.dt_init(
+                self.dt_rank, self.d_inner, dt_scale, dt_init, dt_min, dt_max, dt_init_floor, **factory_kwargs
+            ),
         )
         self.dt_projs_weight = nn.Parameter(torch.stack([t.weight for t in self.dt_projs], dim=0))  # (K=4, inner, rank)
         self.dt_projs_bias = nn.Parameter(torch.stack([t.bias for t in self.dt_projs], dim=0))  # (K=4, inner)
@@ -211,12 +217,13 @@ class Selective_Scan(nn.Module):
         self.selective_scan = selective_scan_fn
 
     @staticmethod
-    def dt_init(dt_rank, d_inner, dt_scale=1.0, dt_init="random", dt_min=0.001, dt_max=0.1, dt_init_floor=1e-4,
-                **factory_kwargs):
+    def dt_init(
+        dt_rank, d_inner, dt_scale=1.0, dt_init="random", dt_min=0.001, dt_max=0.1, dt_init_floor=1e-4, **factory_kwargs
+    ):
         dt_proj = nn.Linear(dt_rank, d_inner, bias=True, **factory_kwargs)
 
         # Initialize special dt projection to preserve variance at initialization
-        dt_init_std = dt_rank ** -0.5 * dt_scale
+        dt_init_std = dt_rank**-0.5 * dt_scale
         if dt_init == "constant":
             nn.init.constant_(dt_proj.weight, dt_init_std)
         elif dt_init == "random":
@@ -226,8 +233,7 @@ class Selective_Scan(nn.Module):
 
         # Initialize dt bias so that F.softplus(dt_bias) is between dt_min and dt_max
         dt = torch.exp(
-            torch.rand(d_inner, **factory_kwargs) * (math.log(dt_max) - math.log(dt_min))
-            + math.log(dt_min)
+            torch.rand(d_inner, **factory_kwargs) * (math.log(dt_max) - math.log(dt_min)) + math.log(dt_min)
         ).clamp(min=dt_init_floor)
         # Inverse of softplus: https://github.com/pytorch/pytorch/issues/72759
         inv_dt = dt + torch.log(-torch.expm1(-dt))
@@ -283,8 +289,13 @@ class Selective_Scan(nn.Module):
         As = -torch.exp(self.A_logs.float()).view(-1, self.d_state)
         dt_projs_bias = self.dt_projs_bias.float().view(-1)  # (k * d)
         out_y = self.selective_scan(
-            xs, dts,
-            As, Bs, Cs, Ds, z=None,
+            xs,
+            dts,
+            As,
+            Bs,
+            Cs,
+            Ds,
+            z=None,
             delta_bias=dt_projs_bias,
             delta_softplus=True,
             return_last_state=False,
@@ -300,15 +311,15 @@ class Selective_Scan(nn.Module):
         y = y.permute(0, 2, 1).contiguous()
         return y
 
+
 class WindowAttention(nn.Module):
-    r"""
-    Shifted Window-based Multi-head Self-Attention
+    r"""Shifted Window-based Multi-head Self-Attention.
 
     Args:
         dim (int): Number of input channels.
         window_size (tuple[int]): The height and width of the window.
         num_heads (int): Number of attention heads.
-        qkv_bias (bool, optional):  If True, add a learnable bias to query, key, value. Default: True
+        qkv_bias (bool, optional): If True, add a learnable bias to query, key, value. Default: True
     """
 
     def __init__(self, dim, window_size, num_heads, qkv_bias=True):
@@ -319,15 +330,16 @@ class WindowAttention(nn.Module):
         self.num_heads = num_heads
         self.qkv_bias = qkv_bias
         head_dim = dim // num_heads
-        self.scale = head_dim ** -0.5
+        self.scale = head_dim**-0.5
 
         # define a parameter table of relative position bias
         self.relative_position_bias_table = nn.Parameter(
-            torch.zeros((2 * window_size[0] - 1) * (2 * window_size[1] - 1), num_heads))  # 2*Wh-1 * 2*Ww-1, nH
+            torch.zeros((2 * window_size[0] - 1) * (2 * window_size[1] - 1), num_heads)
+        )  # 2*Wh-1 * 2*Ww-1, nH
 
         self.proj = nn.Linear(dim, dim)
 
-        trunc_normal_(self.relative_position_bias_table, std=.02)
+        trunc_normal_(self.relative_position_bias_table, std=0.02)
         self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, qkv, rpi, mask=None):
@@ -335,7 +347,7 @@ class WindowAttention(nn.Module):
         Args:
             qkv: Input query, key, and value tokens with shape of (num_windows*b, n, c*3)
             rpi: Relative position index
-            mask (0/-inf):  Mask with shape of (num_windows, Wh*Ww, Wh*Ww) or None
+            mask (0/-inf): Mask with shape of (num_windows, Wh*Ww, Wh*Ww) or None.
         """
         b_, n, c3 = qkv.shape
         c = c3 // 3
@@ -343,10 +355,11 @@ class WindowAttention(nn.Module):
         q, k, v = qkv[0], qkv[1], qkv[2]  # make torchscript happy (cannot use tensor as tuple)
 
         q = q * self.scale
-        attn = (q @ k.transpose(-2, -1))
+        attn = q @ k.transpose(-2, -1)
 
         relative_position_bias = self.relative_position_bias_table[rpi.view(-1)].view(
-            self.window_size[0] * self.window_size[1], self.window_size[0] * self.window_size[1], -1)  # Wh*Ww,Wh*Ww,nH
+            self.window_size[0] * self.window_size[1], self.window_size[0] * self.window_size[1], -1
+        )  # Wh*Ww,Wh*Ww,nH
         relative_position_bias = relative_position_bias.permute(2, 0, 1).contiguous()  # nH, Wh*Ww, Wh*Ww
         attn = attn + relative_position_bias.unsqueeze(0)
 
@@ -362,21 +375,23 @@ class WindowAttention(nn.Module):
         x = self.proj(x)
         return x
 
+
 class AttentiveLayer(nn.Module):
-    def __init__(self,
-                 dim,
-                 input_size,
-                 d_state=8,
-                 num_heads=4,
-                 window_size=4,
-                 shift_size=2,
-                 inner_rank=32,
-                 num_tokens=64,
-                 convffn_kernel_size=5,
-                 mlp_ratio=1,
-                 qkv_bias=True,
-                 norm_layer=nn.LayerNorm,
-                 ):
+    def __init__(
+        self,
+        dim,
+        input_size,
+        d_state=8,
+        num_heads=4,
+        window_size=4,
+        shift_size=2,
+        inner_rank=32,
+        num_tokens=64,
+        convffn_kernel_size=5,
+        mlp_ratio=1,
+        qkv_bias=True,
+        norm_layer=nn.LayerNorm,
+    ):
         super().__init__()
 
         self.dim = dim
@@ -409,18 +424,12 @@ class AttentiveLayer(nn.Module):
             qkv_bias=qkv_bias,
         )
 
-        self.assm = ASSM(
-            self.dim,
-            d_state,
-            num_tokens=num_tokens,
-            inner_rank=inner_rank,
-            mlp_ratio=mlp_ratio
-        )
+        self.assm = ASSM(self.dim, d_state, num_tokens=num_tokens, inner_rank=inner_rank, mlp_ratio=mlp_ratio)
 
         mlp_hidden_dim = int(dim * self.mlp_ratio)
 
-        self.convffn1 = GatedMLP(in_features=dim,hidden_features=mlp_hidden_dim,out_features=dim)
-        self.convffn2 =  GatedMLP(in_features=dim,hidden_features=mlp_hidden_dim,out_features=dim)
+        self.convffn1 = GatedMLP(in_features=dim, hidden_features=mlp_hidden_dim, out_features=dim)
+        self.convffn2 = GatedMLP(in_features=dim, hidden_features=mlp_hidden_dim, out_features=dim)
 
         self.embeddingA = nn.Embedding(self.inner_rank, d_state)
         self.embeddingA.weight.data.uniform_(-1 / self.inner_rank, 1 / self.inner_rank)
@@ -428,8 +437,8 @@ class AttentiveLayer(nn.Module):
         # self.attn_mask = self.calculate_mask(input_size)
         # self.rpi = self.calculate_rpi_sa()
 
-        self.register_buffer('attn_mask', self.calculate_mask(input_size))
-        self.register_buffer('rpi', self.calculate_rpi_sa())
+        self.register_buffer("attn_mask", self.calculate_mask(input_size))
+        self.register_buffer("rpi", self.calculate_rpi_sa())
 
     def calculate_rpi_sa(self):
         # calculate relative position index for SW-MSA
@@ -449,10 +458,16 @@ class AttentiveLayer(nn.Module):
         # calculate attention mask for SW-MSA
         h, w = x_size
         img_mask = torch.zeros((1, h, w, 1))  # 1 h w 1
-        h_slices = (slice(0, -self.window_size), slice(-self.window_size,
-                                                       -(self.window_size // 2)), slice(-(self.window_size // 2), None))
-        w_slices = (slice(0, -self.window_size), slice(-self.window_size,
-                                                       -(self.window_size // 2)), slice(-(self.window_size // 2), None))
+        h_slices = (
+            slice(0, -self.window_size),
+            slice(-self.window_size, -(self.window_size // 2)),
+            slice(-(self.window_size // 2), None),
+        )
+        w_slices = (
+            slice(0, -self.window_size),
+            slice(-self.window_size, -(self.window_size // 2)),
+            slice(-(self.window_size // 2), None),
+        )
         cnt = 0
         for h in h_slices:
             for w in w_slices:
@@ -462,7 +477,7 @@ class AttentiveLayer(nn.Module):
         mask_windows = window_partition(img_mask, self.window_size)  # nw, window_size, window_size, 1
         mask_windows = mask_windows.view(-1, self.window_size * self.window_size)
         attn_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)
-        attn_mask = attn_mask.masked_fill(attn_mask != 0, float(-100.0)).masked_fill(attn_mask == 0, float(0.0))
+        attn_mask = attn_mask.masked_fill(attn_mask != 0, (-100.0)).masked_fill(attn_mask == 0, 0.0)
 
         return attn_mask
 
@@ -474,7 +489,7 @@ class AttentiveLayer(nn.Module):
         b, c, h, w = x.size()
         x_size = (h, w)
         n = h * w
-        x = x.flatten(2).permute(0, 2, 1).contiguous() # b h*w c
+        x = x.flatten(2).permute(0, 2, 1).contiguous()  # b h*w c
         c3 = 3 * c
 
         # part1: Window-MHSA
