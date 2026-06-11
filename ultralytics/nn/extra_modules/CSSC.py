@@ -2,17 +2,25 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class ChannelPool(nn.Module):
     def forward(self, x):
         # 将maxpooling 与 global average pooling 结果拼接在一起
         return torch.cat((torch.max(x, 1)[0].unsqueeze(1), torch.mean(x, 1).unsqueeze(1)), dim=1)
 
+
 class Basic(nn.Module):
     def __init__(self, in_planes, out_planes, kernel_size, stride=1, padding=0, relu=True, bn=True, bias=False):
-        super(Basic, self).__init__()
+        super().__init__()
         self.out_channels = out_planes
-        self.conv = nn.Conv2d(in_channels=in_planes, out_channels=out_planes, kernel_size=kernel_size, stride=stride,
-                              padding=padding, bias=bias)
+        self.conv = nn.Conv2d(
+            in_channels=in_planes,
+            out_channels=out_planes,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding=padding,
+            bias=bias,
+        )
         self.bn = nn.BatchNorm2d(out_planes, eps=1e-5, momentum=0.01, affine=True) if bn else None
         self.relu = nn.LeakyReLU() if relu else None
 
@@ -24,16 +32,17 @@ class Basic(nn.Module):
             x = self.relu(x)
         return x
 
+
 class CALayer(nn.Module):
     def __init__(self, channel, reduction=16):
-        super(CALayer, self).__init__()
+        super().__init__()
 
         self.avgPoolW = nn.AdaptiveAvgPool2d((1, None))
         self.maxPoolW = nn.AdaptiveMaxPool2d((1, None))
 
-
-        self.conv_1x1 = nn.Conv2d(in_channels=2 * channel, out_channels=2 * channel, kernel_size=1, padding=0, stride=1,
-                                  bias=False)
+        self.conv_1x1 = nn.Conv2d(
+            in_channels=2 * channel, out_channels=2 * channel, kernel_size=1, padding=0, stride=1, bias=False
+        )
         self.bn = nn.BatchNorm2d(2 * channel, eps=1e-5, momentum=0.01, affine=True)
         self.Relu = nn.LeakyReLU()
 
@@ -52,7 +61,7 @@ class CALayer(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        N, C, H, W = x.size()
+        _N, C, _H, _W = x.size()
         res = x
         x_cat = torch.cat([self.avgPoolW(x), self.maxPoolW(x)], 1)
         x = self.Relu(self.bn(self.conv_1x1(x_cat)))
@@ -67,9 +76,10 @@ class CALayer(nn.Module):
 
         return out
 
+
 class spatial_attn_layer(nn.Module):
     def __init__(self, kernel_size=3):
-        super(spatial_attn_layer, self).__init__()
+        super().__init__()
         self.compress = ChannelPool()
         self.spatial = Basic(2, 1, kernel_size, stride=1, padding=(kernel_size - 1) // 2, bn=False, relu=False)
 
@@ -79,9 +89,10 @@ class spatial_attn_layer(nn.Module):
         scale = torch.sigmoid(x_out)  # broadcasting
         return x * scale
 
+
 class CSSC(nn.Module):
     def __init__(self, in_channel, reduction=16):
-        super(CSSC, self).__init__()
+        super().__init__()
         pooling_r = 4
         self.head = nn.Sequential(
             nn.Conv2d(in_channels=in_channel, out_channels=in_channel, kernel_size=3, padding=1, stride=1, bias=True),
@@ -90,14 +101,14 @@ class CSSC(nn.Module):
         self.SC = nn.Sequential(
             nn.AvgPool2d(kernel_size=pooling_r, stride=pooling_r),
             nn.Conv2d(in_channels=in_channel, out_channels=in_channel, kernel_size=3, padding=1, stride=1, bias=True),
-            nn.BatchNorm2d(in_channel)
+            nn.BatchNorm2d(in_channel),
         )
         self.SA = spatial_attn_layer()  ## Spatial Attention
         self.CA = CALayer(in_channel, reduction)  ## Channel Attention
 
         self.conv1x1 = nn.Sequential(
             nn.Conv2d(in_channel * 2, in_channel, kernel_size=1),
-            nn.Conv2d(in_channels=in_channel, out_channels=in_channel, kernel_size=3, padding=1, stride=1, bias=True)
+            nn.Conv2d(in_channels=in_channel, out_channels=in_channel, kernel_size=3, padding=1, stride=1, bias=True),
         )
         self.ReLU = nn.LeakyReLU()
         self.tail = nn.Conv2d(in_channels=in_channel, out_channels=in_channel, kernel_size=3, padding=1)
@@ -109,36 +120,38 @@ class CSSC(nn.Module):
         ca_branch = self.CA(x)
         x1 = torch.cat([sa_branch, ca_branch], dim=1)  # 拼接
         x1 = self.conv1x1(x1)
-        x2 = torch.sigmoid(
-            torch.add(x, F.interpolate(self.SC(x), x.size()[2:])))
+        x2 = torch.sigmoid(torch.add(x, F.interpolate(self.SC(x), x.size()[2:])))
         out = torch.mul(x1, x2)
         out = self.tail(out)
         out = out + res
         out = self.ReLU(out)
         return out
 
+
 class CNCM(nn.Module):
     def __init__(self, channel_in, reduction=8):
-        super(CNCM, self).__init__()
+        super().__init__()
 
         # RCSSC
-        self.unit_1 = CSSC(int(channel_in / 2.), reduction)
-        self.unit_2 = CSSC(int(channel_in / 2.), reduction)
+        self.unit_1 = CSSC(int(channel_in / 2.0), reduction)
+        self.unit_2 = CSSC(int(channel_in / 2.0), reduction)
 
         self.conv1 = nn.Sequential(
-            nn.Conv2d(in_channels=channel_in, out_channels=int(channel_in / 2.), kernel_size=3, padding=1),
-            nn.LeakyReLU()
+            nn.Conv2d(in_channels=channel_in, out_channels=int(channel_in / 2.0), kernel_size=3, padding=1),
+            nn.LeakyReLU(),
         )
         self.conv2 = nn.Sequential(
-            nn.Conv2d(in_channels=int(channel_in * 3 / 2.), out_channels=int(channel_in / 2.), kernel_size=3,
-                      padding=1),
-            nn.LeakyReLU()
+            nn.Conv2d(
+                in_channels=int(channel_in * 3 / 2.0), out_channels=int(channel_in / 2.0), kernel_size=3, padding=1
+            ),
+            nn.LeakyReLU(),
         )
         self.conv3 = nn.Sequential(
-            nn.Conv2d(in_channels=channel_in * 2, out_channels=channel_in, kernel_size=1, padding=0,
-                      stride=1),  # 做压缩
+            nn.Conv2d(
+                in_channels=channel_in * 2, out_channels=channel_in, kernel_size=1, padding=0, stride=1
+            ),  # 做压缩
             nn.Conv2d(in_channels=channel_in, out_channels=channel_in, kernel_size=3, padding=1),
-            nn.LeakyReLU()
+            nn.LeakyReLU(),
         )
 
     def forward(self, x):

@@ -1,14 +1,17 @@
 # Official-Code Optimization Experiment Plan
 
 ## Goal
+
 Use official Ultralytics commands/code paths to find the best Raspberry Pi deployment route for `yolo26n.pt`, with minimal custom code and no changes to existing project files.
 
 ## Principle
+
 Do not judge optimization on the server alone. Server GPU/CPU results are only sanity checks. The final decision must be made on the Raspberry Pi target device using the same model, same video/image source, and same preprocessing settings.
 
 ## Stage 0: Establish A Fair Baseline
 
 ### Experiment 0.1: PyTorch `.pt` Validation
+
 Purpose: confirm the original model's accuracy.
 
 ```bash
@@ -16,6 +19,7 @@ yolo detect val model=/home/admin1/Projects/ultralytics-main/yolo26n.pt data=/ho
 ```
 
 Record:
+
 - Precision
 - Recall
 - mAP50
@@ -23,6 +27,7 @@ Record:
 - inference ms/img
 
 ### Experiment 0.2: PyTorch Prediction Speed On Real Inputs
+
 Purpose: measure real workflow speed, not only validation speed.
 
 ```bash
@@ -44,12 +49,14 @@ done
 ```
 
 Decision rule:
+
 - If `512` loses less than about 0.02 mAP50-95 and Recall remains high, prefer `512` for Raspberry Pi.
 - Avoid `320` unless speed is far more important than accuracy.
 
 ## Stage 2: Official Export Backends
 
 ### Experiment 2.1: NCNN Export
+
 Purpose: primary Raspberry Pi CPU candidate.
 
 ```bash
@@ -65,6 +72,7 @@ yolo detect val model=/home/admin1/Projects/ultralytics-main/yolo26n_ncnn_model 
 Repeat at `imgsz=512` during predict/val on Raspberry Pi.
 
 ### Experiment 2.2: ONNX Export
+
 Purpose: fallback and comparison backend.
 
 ```bash
@@ -79,12 +87,14 @@ yolo detect val model=/home/admin1/Projects/ultralytics-main/yolo26n.onnx data=/
 ```
 
 Decision rule:
+
 - On Raspberry Pi, compare NCNN vs ONNX using the same source and `imgsz`.
 - Keep the faster backend if mAP/Recall is effectively unchanged.
 
 ## Stage 3: Quantization
 
 ### Experiment 3.1: NCNN FP16
+
 Purpose: test whether smaller/FP16 NCNN helps target device.
 
 ```bash
@@ -94,6 +104,7 @@ yolo export model=/home/admin1/Projects/ultralytics-main/yolo26n.pt format=ncnn 
 Note: FP16 benefits depend on backend/hardware support. It may not help CPU-only Raspberry Pi.
 
 ### Experiment 3.2: TFLite / INT8 TFLite In A Separate Export Environment
+
 Purpose: test mobile/ARM quantized model.
 
 Current environment failed TensorFlow dependency resolution. Use a clean Python environment compatible with TensorFlow required by Ultralytics.
@@ -106,6 +117,7 @@ yolo export model=/home/admin1/Projects/ultralytics-main/yolo26n.pt format=tflit
 ```
 
 Decision rule:
+
 - INT8 is only useful if Recall/mAP drop is acceptable and Raspberry Pi inference speed improves.
 
 ## Stage 4: Raspberry Pi Real Benchmark
@@ -113,12 +125,14 @@ Decision rule:
 Purpose: make final decision on real hardware.
 
 On Raspberry Pi, test:
+
 - `.pt` at 640 and 512
 - NCNN at 640 and 512
 - ONNX at 640 and 512
 - optional TFLite/INT8 if export succeeds
 
 Record:
+
 - FPS on real video
 - CPU usage
 - memory usage
@@ -148,15 +162,18 @@ These often beat model-only changes on Raspberry Pi:
 Use distillation only after Stage 1-5 prove that speed requires a lower resolution or smaller model that loses too much accuracy.
 
 Candidate setup:
+
 - Teacher: current `yolo26n.pt` or stronger `yolo26s/yolo26m`.
 - Student: lower-width YOLO26 config or lower-resolution training/inference model.
 
 Decision rule:
+
 - Distillation is worth it if `imgsz=512` or `416` is fast enough but Recall/mAP is too low.
 
 ## Stage 7: Physical Pruning Only After Backend Tests
 
 The previous zero-channel pruning is not enough because it does not physically remove channels. If pruning is revisited:
+
 - Use physical channel pruning with model graph surgery.
 - Fine-tune after pruning.
 - Export the compact model to NCNN/ONNX.

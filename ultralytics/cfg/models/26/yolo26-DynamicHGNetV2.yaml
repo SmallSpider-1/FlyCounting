@@ -16,20 +16,20 @@ scales: # model compound scaling constants, i.e. 'model=yolo26n.yaml' will call 
 # YOLO26n backbone
 backbone:
   # [from, repeats, module, args]
-  - [-1, 1, HGStem, [32, 48]]  # 0-P2/4
-  - [-1, 6, Dynamic_HGBlock, [48, 128, 3]]  # stage 1
+  - [-1, 1, HGStem, [32, 48]] # 0-P2/4
+  - [-1, 6, Dynamic_HGBlock, [48, 128, 3]] # stage 1
 
-  - [-1, 1, DWConv, [128, 3, 2, 1, False]]  # 2-P3/8
-  - [-1, 6, Dynamic_HGBlock, [96, 512, 3]]   # stage 2
+  - [-1, 1, DWConv, [128, 3, 2, 1, False]] # 2-P3/8
+  - [-1, 6, Dynamic_HGBlock, [96, 512, 3]] # stage 2
 
-  - [-1, 1, DWConv, [512, 3, 2, 1, False]]  # 4-P4/16
-  - [-1, 6, Dynamic_HGBlock, [192, 1024, 1, True, False]]  # cm, c2, k, light, shortcut
+  - [-1, 1, DWConv, [512, 3, 2, 1, False]] # 4-P4/16
+  - [-1, 6, Dynamic_HGBlock, [192, 1024, 1, True, False]] # cm, c2, k, light, shortcut
   - [-1, 6, Dynamic_HGBlock, [192, 1024, 1, True, True]]
-  - [-1, 6, Dynamic_HGBlock, [192, 1024, 1, True, True]]  # stage 3
+  - [-1, 6, Dynamic_HGBlock, [192, 1024, 1, True, True]] # stage 3
 
-  - [-1, 1, DWConv, [1024, 3, 2, 1, False]]  # 8-P5/32
-  - [-1, 6, Dynamic_HGBlock, [384, 2048, 1, True, False]]  # stage 4
-  - [-1, 1, SPPF, [1024, 5]]  # 10
+  - [-1, 1, DWConv, [1024, 3, 2, 1, False]] # 8-P5/32
+  - [-1, 6, Dynamic_HGBlock, [384, 2048, 1, True, False]] # stage 4
+  - [-1, 1, SPPF, [1024, 5]] # 10
   - [-1, 2, C2PSA, [1024]] # 11
 
 # YOLO26n head

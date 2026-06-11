@@ -1,15 +1,19 @@
-import torch, math
+from __future__ import annotations
+
+import math
+from functools import partial
+from typing import Callable
+
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from einops import rearrange, repeat
-from functools import partial
-from torch import Tensor
-from typing import Optional, Callable
-from timm.layers import DropPath, trunc_normal_
 import torch.utils.checkpoint as checkpoint
+from einops import rearrange, repeat
+from timm.layers import DropPath, trunc_normal_
+from torch import Tensor
 
 try:
-    from mamba_ssm.ops.selective_scan_interface import selective_scan_fn, mamba_inner_fn
+    from mamba_ssm.ops.selective_scan_interface import mamba_inner_fn, selective_scan_fn
 except:
     selective_scan_fn, mamba_inner_fn = None, None
 
@@ -28,13 +32,14 @@ try:
 except ImportError:
     RMSNorm, layer_norm_fn, rms_norm_fn = None, None, None
 
-from ..modules.conv import DSConv, Conv
+from ..modules.conv import Conv, DSConv
 
-__all__ = ['MSAM', 'GL_VSS']
+__all__ = ["GL_VSS", "MSAM"]
+
 
 class AttentionWeight(nn.Module):
     def __init__(self, channel, kernel_size=7):
-        super(AttentionWeight, self).__init__()
+        super().__init__()
         padding = (kernel_size - 1) // 2
         self.conv1 = nn.Conv2d(2, 1, kernel_size=1)
         self.conv2 = nn.Conv1d(channel, channel, kernel_size, padding=padding, groups=channel, bias=False)
@@ -42,7 +47,7 @@ class AttentionWeight(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        b, w, c, h = x.size()
+        b, _w, c, h = x.size()
         x_weight = torch.cat((torch.max(x, 1)[0].unsqueeze(1), torch.mean(x, 1).unsqueeze(1)), dim=1)
         x_weight = self.conv1(x_weight).view(b, c, h)
         x_weight = self.sigmoid(self.bn(self.conv2(x_weight)))
@@ -53,7 +58,7 @@ class AttentionWeight(nn.Module):
 
 class IIA(nn.Module):
     def __init__(self, channel):
-        super(IIA, self).__init__()
+        super().__init__()
         self.attention = AttentionWeight(channel)
 
     def forward(self, x):
@@ -69,14 +74,13 @@ class IIA(nn.Module):
         # return x + 1 / 2 * (x_h + x_w)  # 89.8	92.5	81.9
         return x + x_h + x_w
 
+
 class Conformity(nn.Module):
     def __init__(self, in_channels, out_channels):
-        super(Conformity, self).__init__()
+        super().__init__()
         self.IIA = IIA(in_channels)
         self.conv = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU6()
+            nn.Conv2d(in_channels, out_channels, kernel_size=1), nn.BatchNorm2d(out_channels), nn.ReLU6()
         )
 
     def forward(self, x):
@@ -85,9 +89,10 @@ class Conformity(nn.Module):
 
         return x
 
+
 class IndentityBlock(nn.Module):
     def __init__(self, in_channel, kernel_size, filters, rate=1):
-        super(IndentityBlock, self).__init__()
+        super().__init__()
         F1, F2, F3 = filters
         self.stage = nn.Sequential(
             nn.Conv2d(in_channel, F1, 1, stride=1, padding=0, bias=False),
@@ -106,50 +111,48 @@ class IndentityBlock(nn.Module):
         X = self.relu_1(X)
         return X
 
+
 class SelfAttention(nn.Module):
     def __init__(self, dim_out):
-        super(SelfAttention, self).__init__()
+        super().__init__()
         self.conv = DSConv(dim_out * 2, (dim_out // 2) * 3, 3)
         self.att_dim = dim_out // 2
 
     def forward(self, x, y):
-        b, c, h, w = x.shape
+        b, _c, h, w = x.shape
         fm = self.conv(torch.concat([x, y], dim=1))
 
-        Q, K, V = rearrange(fm, 'b (qkv c) h w -> qkv b h c w'
-                            , qkv=3, b=b, c=self.att_dim, h=h, w=w)
+        Q, K, V = rearrange(fm, "b (qkv c) h w -> qkv b h c w", qkv=3, b=b, c=self.att_dim, h=h, w=w)
 
-        dots = (Q @ K.transpose(-2, -1))
+        dots = Q @ K.transpose(-2, -1)
         attn = dots.softmax(dim=-1)
         attn = attn @ V
         attn = attn.view(b, -1, h, w)
 
         return attn
 
+
 class MSAM(nn.Module):
     def __init__(self, dim_in, dim_out):
-        super(MSAM, self).__init__()
+        super().__init__()
         self.branch1 = nn.Sequential(
             DSConv(dim_in[0], dim_out, 3, s=2),
             DSConv(dim_out, dim_out, 3, s=2),
         )
         self.branch2 = DSConv(dim_in[1], dim_out, 3, s=2)
         self.branch3 = Conv(dim_in[2], dim_out, 1)
-        self.branch4 = nn.Sequential(
-            nn.Upsample(scale_factor=2),
-            Conv(dim_in[3], dim_out)
-        )
+        self.branch4 = nn.Sequential(nn.Upsample(scale_factor=2), Conv(dim_in[3], dim_out))
         self.merge = Conv(4 * dim_out, dim_out)
         self.resblock = nn.Sequential(
             IndentityBlock(in_channel=dim_out, kernel_size=3, filters=[dim_out, dim_out, dim_out]),
-            IndentityBlock(in_channel=dim_out, kernel_size=3, filters=[dim_out, dim_out, dim_out])
+            IndentityBlock(in_channel=dim_out, kernel_size=3, filters=[dim_out, dim_out, dim_out]),
         )
         self.transformer = SelfAttention(dim_out)
         self.conv = nn.Conv2d(dim_out // 2 * 10, dim_out, 1)
         self.dim_out = dim_out
 
     def forward(self, input):
-        b, c, h, w = input[2].shape
+        b, _c, h, w = input[2].shape
         list1 = []
         list2 = []
 
@@ -181,12 +184,18 @@ class MSAM(nn.Module):
 
         return out + merge
 
+
 class Block(nn.Module):
     def __init__(
-        self, dim, mixer_cls, norm_cls=nn.LayerNorm, fused_add_norm=False, residual_in_fp32=False,drop_path=0.,
+        self,
+        dim,
+        mixer_cls,
+        norm_cls=nn.LayerNorm,
+        fused_add_norm=False,
+        residual_in_fp32=False,
+        drop_path=0.0,
     ):
-        """
-        Simple block wrapping a mixer class with LayerNorm/RMSNorm and residual connection"
+        """Simple block wrapping a mixer class with LayerNorm/RMSNorm and residual connection".
 
         This Block has a slightly different structure compared to a regular
         prenorm Transformer block.
@@ -202,16 +211,14 @@ class Block(nn.Module):
         self.fused_add_norm = fused_add_norm
         self.mixer = mixer_cls(dim)
         self.norm = norm_cls(dim)
-        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+        self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
         if self.fused_add_norm:
             assert RMSNorm is not None, "RMSNorm import fails"
-            assert isinstance(
-                self.norm, (nn.LayerNorm, RMSNorm)
-            ), "Only LayerNorm and RMSNorm are supported for fused_add_norm"
+            assert isinstance(self.norm, (nn.LayerNorm, RMSNorm)), (
+                "Only LayerNorm and RMSNorm are supported for fused_add_norm"
+            )
 
-    def forward(
-        self, hidden_states: Tensor, residual: Optional[Tensor] = None, inference_params=None
-    ):
+    def forward(self, hidden_states: Tensor, residual: Tensor | None = None, inference_params=None):
         r"""Pass the input through the encoder layer.
 
         Args:
@@ -223,7 +230,7 @@ class Block(nn.Module):
                 residual = hidden_states
             else:
                 residual = residual + self.drop_path(hidden_states)
-            
+
             hidden_states = self.norm(residual.to(dtype=self.norm.weight.dtype))
             if self.residual_in_fp32:
                 residual = residual.to(torch.float32)
@@ -248,18 +255,19 @@ class Block(nn.Module):
                     prenorm=True,
                     residual_in_fp32=self.residual_in_fp32,
                     eps=self.norm.eps,
-                )    
+                )
         hidden_states = self.mixer(hidden_states, inference_params=inference_params)
         return hidden_states, residual
 
     # def allocate_inference_cache(self, batch_size, max_seqlen, dtype=None, **kwargs):
     #     return self.mixer.allocate_inference_cache(batch_size, max_seqlen, dtype=dtype, **kwargs)
-    
+
+
 def create_block(
     d_model,
     ssm_cfg=None,
     norm_epsilon=1e-5,
-    drop_path=0.,
+    drop_path=0.0,
     rms_norm=False,
     residual_in_fp32=False,
     fused_add_norm=False,
@@ -273,10 +281,16 @@ def create_block(
     if ssm_cfg is None:
         ssm_cfg = {}
     factory_kwargs = {"device": device, "dtype": dtype}
-    mixer_cls = partial(Mamba, layer_idx=layer_idx, bimamba_type=bimamba_type, if_devide_out=if_devide_out, init_layer_scale=init_layer_scale, **ssm_cfg, **factory_kwargs)
-    norm_cls = partial(
-        nn.LayerNorm if not rms_norm else RMSNorm, eps=norm_epsilon, **factory_kwargs
+    mixer_cls = partial(
+        Mamba,
+        layer_idx=layer_idx,
+        bimamba_type=bimamba_type,
+        if_devide_out=if_devide_out,
+        init_layer_scale=init_layer_scale,
+        **ssm_cfg,
+        **factory_kwargs,
     )
+    norm_cls = partial(nn.LayerNorm if not rms_norm else RMSNorm, eps=norm_epsilon, **factory_kwargs)
     block = Block(
         d_model,
         mixer_cls,
@@ -287,6 +301,7 @@ def create_block(
     )
     block.layer_idx = layer_idx
     return block
+
 
 # https://github.com/huggingface/transformers/blob/c28d04e9e252a1a099944e325685f14d242ecdcd/src/transformers/models/gpt2/modeling_gpt2.py#L454
 def _init_weights(
@@ -320,6 +335,7 @@ def _init_weights(
                 with torch.no_grad():
                     p /= math.sqrt(n_residuals_per_layer * n_layer)
 
+
 def segm_init_weights(m):
     if isinstance(m, nn.Linear):
         trunc_normal_(m.weight, std=0.02)
@@ -331,28 +347,29 @@ def segm_init_weights(m):
         if m.weight is not None:
             nn.init.constant_(m.weight, 1.0)
 
+
 class Mamba(nn.Module):
     def __init__(
-            self,
-            d_model,
-            d_state=16,
-            d_conv=4,
-            expand=2,
-            dt_rank="auto",
-            dt_min=0.001,
-            dt_max=0.1,
-            dt_init="random",
-            dt_scale=1.0,
-            dt_init_floor=1e-4,
-            conv_bias=True,
-            bias=False,
-            use_fast_path=True,  # Fused kernel options
-            layer_idx=None,
-            device=None,
-            dtype=None,
-            bimamba_type="none",
-            if_devide_out=True,
-            init_layer_scale=None,
+        self,
+        d_model,
+        d_state=16,
+        d_conv=4,
+        expand=2,
+        dt_rank="auto",
+        dt_min=0.001,
+        dt_max=0.1,
+        dt_init="random",
+        dt_scale=1.0,
+        dt_init_floor=1e-4,
+        conv_bias=True,
+        bias=False,
+        use_fast_path=True,  # Fused kernel options
+        layer_idx=None,
+        device=None,
+        dtype=None,
+        bimamba_type="none",
+        if_devide_out=True,
+        init_layer_scale=None,
     ):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
@@ -369,7 +386,7 @@ class Mamba(nn.Module):
         self.init_layer_scale = init_layer_scale
 
         if init_layer_scale is not None:
-            self.gamma = nn.Parameter(init_layer_scale * torch.ones((d_model)), requires_grad=True)
+            self.gamma = nn.Parameter(init_layer_scale * torch.ones(d_model), requires_grad=True)
 
         self.in_proj = nn.Linear(self.d_model, self.d_inner * 2, bias=bias, **factory_kwargs)
 
@@ -386,13 +403,11 @@ class Mamba(nn.Module):
         self.activation = "silu"
         self.act = nn.SiLU()
 
-        self.x_proj = nn.Linear(
-            self.d_inner, self.dt_rank + self.d_state * 2, bias=False, **factory_kwargs
-        )
+        self.x_proj = nn.Linear(self.d_inner, self.dt_rank + self.d_state * 2, bias=False, **factory_kwargs)
         self.dt_proj = nn.Linear(self.dt_rank, self.d_inner, bias=True, **factory_kwargs)
 
         # Initialize special dt projection to preserve variance at initialization
-        dt_init_std = self.dt_rank ** -0.5 * dt_scale
+        dt_init_std = self.dt_rank**-0.5 * dt_scale
         if dt_init == "constant":
             nn.init.constant_(self.dt_proj.weight, dt_init_std)
         elif dt_init == "random":
@@ -402,8 +417,7 @@ class Mamba(nn.Module):
 
         # Initialize dt bias so that F.softplus(dt_bias) is between dt_min and dt_max
         dt = torch.exp(
-            torch.rand(self.d_inner, **factory_kwargs) * (math.log(dt_max) - math.log(dt_min))
-            + math.log(dt_min)
+            torch.rand(self.d_inner, **factory_kwargs) * (math.log(dt_max) - math.log(dt_min)) + math.log(dt_min)
         ).clamp(min=dt_init_floor)
         # Inverse of softplus: https://github.com/pytorch/pytorch/issues/72759
         inv_dt = dt + torch.log(-torch.expm1(-dt))
@@ -446,9 +460,7 @@ class Mamba(nn.Module):
             **factory_kwargs,
         )
 
-        self.x_proj_b = nn.Linear(
-            self.d_inner, self.dt_rank + self.d_state * 2, bias=False, **factory_kwargs
-        )
+        self.x_proj_b = nn.Linear(self.d_inner, self.dt_rank + self.d_state * 2, bias=False, **factory_kwargs)
         self.dt_proj_b = nn.Linear(self.dt_rank, self.d_inner, bias=True, **factory_kwargs)
 
         self.D_b = nn.Parameter(torch.ones(self.d_inner, device=device))  # Keep in fp32
@@ -474,24 +486,19 @@ class Mamba(nn.Module):
             **factory_kwargs,
         )
 
-        self.x_proj_r = nn.Linear(
-            self.d_inner, self.dt_rank + self.d_state * 2, bias=False, **factory_kwargs
-        )
+        self.x_proj_r = nn.Linear(self.d_inner, self.dt_rank + self.d_state * 2, bias=False, **factory_kwargs)
         self.dt_proj_r = nn.Linear(self.dt_rank, self.d_inner, bias=True, **factory_kwargs)
 
         self.D_r = nn.Parameter(torch.ones(self.d_inner, device=device))  # Keep in fp32
         self.D_r._no_weight_decay = True
 
-
         self.out_proj = nn.Linear(self.d_inner, self.d_model, bias=bias, **factory_kwargs)
         self.act = nn.SiLU(inplace=True)
 
     def forward(self, hidden_states, inference_params=None):
+        """hidden_states: (B, L, D) Returns: same shape as hidden_states.
         """
-        hidden_states: (B, L, D)
-        Returns: same shape as hidden_states
-        """
-        batch, seqlen, dim = hidden_states.shape
+        batch, seqlen, _dim = hidden_states.shape
 
         conv_state, ssm_state = None, None
         if inference_params is not None:
@@ -512,7 +519,9 @@ class Mamba(nn.Module):
 
         A = -torch.exp(self.A_log.float())  # (d_inner, d_state)
         # In the backward pass we write dx and dz next to each other to avoid torch.cat
-        if self.use_fast_path and causal_conv1d_fn is not None and inference_params is None:  # Doesn't support outputting the states
+        if (
+            self.use_fast_path and causal_conv1d_fn is not None and inference_params is None
+        ):  # Doesn't support outputting the states
             if self.bimamba_type == "v1":
                 A_b = -torch.exp(self.A_b_log.float())
                 out = mamba_inner_fn_no_out_proj(
@@ -543,11 +552,15 @@ class Mamba(nn.Module):
                 )
 
                 if not self.if_devide_out:
-                    out = F.linear(rearrange(out + out_b.flip([-1]), "b d l -> b l d"), self.out_proj.weight,
-                                   self.out_proj.bias)
+                    out = F.linear(
+                        rearrange(out + out_b.flip([-1]), "b d l -> b l d"), self.out_proj.weight, self.out_proj.bias
+                    )
                 else:
-                    out = F.linear(rearrange(out + out_b.flip([-1]), "b d l -> b l d") / 2, self.out_proj.weight,
-                                   self.out_proj.bias)
+                    out = F.linear(
+                        rearrange(out + out_b.flip([-1]), "b d l -> b l d") / 2,
+                        self.out_proj.weight,
+                        self.out_proj.bias,
+                    )
 
             else:
                 out = mamba_inner_fn(
@@ -662,20 +675,15 @@ class Mamba(nn.Module):
     def allocate_inference_cache(self, batch_size, max_seqlen, dtype=None, **kwargs):
         device = self.out_proj.weight.device
         conv_dtype = self.conv1d.weight.dtype if dtype is None else dtype
-        conv_state = torch.zeros(
-            batch_size, self.d_model * self.expand, self.d_conv, device=device, dtype=conv_dtype
-        )
+        conv_state = torch.zeros(batch_size, self.d_model * self.expand, self.d_conv, device=device, dtype=conv_dtype)
         ssm_dtype = self.dt_proj.weight.dtype if dtype is None else dtype
         # ssm_dtype = torch.float32
-        ssm_state = torch.zeros(
-            batch_size, self.d_model * self.expand, self.d_state, device=device, dtype=ssm_dtype
-        )
+        ssm_state = torch.zeros(batch_size, self.d_model * self.expand, self.d_state, device=device, dtype=ssm_dtype)
         return conv_state, ssm_state
 
     def _get_states_from_cache(self, inference_params, batch_size, initialize_states=False):
         assert self.layer_idx is not None
         if self.layer_idx not in inference_params.key_value_memory_dict:
-            batch_shape = (batch_size,)
             conv_state = torch.zeros(
                 batch_size,
                 self.d_model * self.expand,
@@ -702,25 +710,27 @@ class Mamba(nn.Module):
 
 
 class Mamba_Block(nn.Module):
-    def __init__(self,
-                 img_size=16,
-                 depth=24,
-                 embed_dim=192,
-                 out_dim=192*2,
-                 drop_path_rate=0.1,
-                 ssm_cfg=None,
-                 norm_epsilon: float = 1e-5, 
-                 rms_norm: bool = False, 
-                 residual_in_fp32=False,
-                 device=None,
-                 dtype=None,
-                 fused_add_norm=False,
-                 if_rope=False,
-                 bimamba_type="none",
-                 if_devide_out=False,
-                 init_layer_scale=None,
-                 flip_img_sequences_ratio=-1.,
-                 **kwargs) -> None:
+    def __init__(
+        self,
+        img_size=16,
+        depth=24,
+        embed_dim=192,
+        out_dim=192 * 2,
+        drop_path_rate=0.1,
+        ssm_cfg=None,
+        norm_epsilon: float = 1e-5,
+        rms_norm: bool = False,
+        residual_in_fp32=False,
+        device=None,
+        dtype=None,
+        fused_add_norm=False,
+        if_rope=False,
+        bimamba_type="none",
+        if_devide_out=False,
+        init_layer_scale=None,
+        flip_img_sequences_ratio=-1.0,
+        **kwargs,
+    ) -> None:
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
         self.embed_dims = embed_dim
@@ -733,8 +743,8 @@ class Mamba_Block(nn.Module):
         # TODO: release this comment
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]  # stochastic depth decay rule
         # import ipdb;ipdb.set_trace()
-        inter_dpr = [0.0] + dpr
-        self.drop_path = DropPath(drop_path_rate) if drop_path_rate > 0. else nn.Identity()
+        inter_dpr = [0.0, *dpr]
+        self.drop_path = DropPath(drop_path_rate) if drop_path_rate > 0.0 else nn.Identity()
 
         self.layers = nn.ModuleList(
             [
@@ -756,9 +766,7 @@ class Mamba_Block(nn.Module):
             ]
         )
         # output head
-        self.norm_f = (nn.LayerNorm if not rms_norm else RMSNorm)(
-            embed_dim, eps=norm_epsilon, **factory_kwargs
-        )
+        self.norm_f = (nn.LayerNorm if not rms_norm else RMSNorm)(embed_dim, eps=norm_epsilon, **factory_kwargs)
         self.apply(segm_init_weights)
         # mamba init
         self.apply(
@@ -772,7 +780,7 @@ class Mamba_Block(nn.Module):
         B, C, H, W = x.shape
 
         # mamba impl
-        
+
         hidden_states = x.flatten(2).transpose(1, 2)
         if residual is not None:
             residual = residual.flatten(2).transpose(1, 2)
@@ -783,7 +791,6 @@ class Mamba_Block(nn.Module):
             #     if residual is not None and self.if_rope_residual:
             #         residual = self.rope(residual)
             hidden_states, residual = layer(hidden_states, residual)
-
 
         if not self.fused_add_norm:
             if residual is None:
@@ -806,9 +813,10 @@ class Mamba_Block(nn.Module):
 
         return hidden_states.transpose(1, 2).view(B, C, H, W)
 
+
 class ChannelAttention(nn.Module):
     def __init__(self, inp, ratio=16):
-        super(ChannelAttention, self).__init__()
+        super().__init__()
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.max_pool = nn.AdaptiveMaxPool2d(1)
 
@@ -823,17 +831,14 @@ class ChannelAttention(nn.Module):
         out = avg_out + max_out
         return self.sigmoid(out)
 
+
 class LocalFeature(nn.Module):
     def __init__(self, dim_in, dim_out, rate=1):
-        super(LocalFeature, self).__init__()
+        super().__init__()
         self.branch1_1 = nn.Sequential(
-            nn.Conv2d(dim_in, dim_out, 1, 1, padding=0, dilation=rate, bias=True),
-            nn.BatchNorm2d(dim_out),
-            nn.SiLU()
+            nn.Conv2d(dim_in, dim_out, 1, 1, padding=0, dilation=rate, bias=True), nn.BatchNorm2d(dim_out), nn.SiLU()
         )
-        self.branch1_2 = nn.Sequential(
-            DSConv(dim_in, dim_out)
-        )
+        self.branch1_2 = nn.Sequential(DSConv(dim_in, dim_out))
         self.branch2 = IndentityBlock(in_channel=dim_in, kernel_size=3, filters=[dim_in, dim_out, dim_out], rate=1)
         self.branch3 = IndentityBlock(in_channel=dim_in, kernel_size=3, filters=[dim_in, dim_out, dim_out], rate=2)
         self.branch4 = IndentityBlock(in_channel=dim_in, kernel_size=3, filters=[dim_in, dim_out, dim_out], rate=3)
@@ -858,7 +863,7 @@ class LocalFeature(nn.Module):
 
 class FeatureEmbedding(nn.Module):
     def __init__(self, in_channel, out_channel):
-        super(FeatureEmbedding, self).__init__()
+        super().__init__()
         self.conv1 = DSConv(in_channel, out_channel, k=3)
         self.conv2 = DSConv(out_channel, out_channel, k=3)
         self.sigmoid = nn.Sigmoid()
@@ -876,18 +881,19 @@ class FeatureEmbedding(nn.Module):
 
 class MambaBlock(nn.Module):
     def __init__(
-            self,
-            hidden_dim: int = 0,
-            drop_path: float = 0,
-            norm_layer: Callable[..., torch.nn.Module] = partial(nn.LayerNorm, eps=1e-6),
-            attn_drop_rate: float = 0,
-            d_state: int = 16,
-            **kwargs,
+        self,
+        hidden_dim: int = 0,
+        drop_path: float = 0,
+        norm_layer: Callable[..., torch.nn.Module] = partial(nn.LayerNorm, eps=1e-6),
+        attn_drop_rate: float = 0,
+        d_state: int = 16,
+        **kwargs,
     ):
         super().__init__()
         # self.ln_1 = norm_layer(hidden_dim)
-        self.self_attention = Mamba_Block(depth=1, embed_dim=hidden_dim // 4, out_dim=hidden_dim // 4,
-                                          bimamba_type='None')
+        self.self_attention = Mamba_Block(
+            depth=1, embed_dim=hidden_dim // 4, out_dim=hidden_dim // 4, bimamba_type="None"
+        )
         self.drop_path = DropPath(drop_path)
 
     def forward(self, input: torch.Tensor):
@@ -903,7 +909,8 @@ class MambaBlock(nn.Module):
 
 
 class GL_VSS(nn.Module):
-    """ A basic Swin Transformer layer for one stage.
+    """A basic Swin Transformer layer for one stage.
+
     Args:
         dim (int): Number of input channels.
         depth (int): Number of blocks.
@@ -916,30 +923,33 @@ class GL_VSS(nn.Module):
     """
 
     def __init__(
-            self,
-            in_dim,
-            dim,
-            depth=1,
-            attn_drop=0.,
-            drop_path=0.,
-            norm_layer=nn.LayerNorm,
-            use_checkpoint=False,
-            d_state=16,
-            **kwargs,
+        self,
+        in_dim,
+        dim,
+        depth=1,
+        attn_drop=0.0,
+        drop_path=0.0,
+        norm_layer=nn.LayerNorm,
+        use_checkpoint=False,
+        d_state=16,
+        **kwargs,
     ):
         super().__init__()
         self.dim = dim
         self.use_checkpoint = use_checkpoint
 
-        self.blocks = nn.ModuleList([
-            MambaBlock(
-                hidden_dim=dim,
-                drop_path=drop_path[i] if isinstance(drop_path, list) else drop_path,
-                norm_layer=norm_layer,
-                attn_drop_rate=attn_drop,
-                d_state=d_state,
-            )
-            for i in range(depth)])
+        self.blocks = nn.ModuleList(
+            [
+                MambaBlock(
+                    hidden_dim=dim,
+                    drop_path=drop_path[i] if isinstance(drop_path, list) else drop_path,
+                    norm_layer=norm_layer,
+                    attn_drop_rate=attn_drop,
+                    d_state=d_state,
+                )
+                for i in range(depth)
+            ]
+        )
 
         self.localfeature = LocalFeature(dim, dim)
         self.featureembedding = FeatureEmbedding(dim, dim)
@@ -947,7 +957,7 @@ class GL_VSS(nn.Module):
         self.channel_down = Conformity(in_dim, dim)
 
     def forward(self, x):
-        b, c, h, w = x.shape
+        _b, _c, _h, _w = x.shape
         if self.channel_down:
             x = self.channel_down(x)
 

@@ -1,13 +1,10 @@
-from typing import Tuple
-
 import numpy as np
 
 from boxmot.motion.kalman_filters.base import BaseKalmanFilter
 
 
 class KalmanFilterXYWH(BaseKalmanFilter):
-    """
-    Kalman filter for XYWH state with optional OBB angle extension.
+    """Kalman filter for XYWH state with optional OBB angle extension.
 
     - `ndim=4`: [x, y, w, h]
     - `ndim=5`: [x, y, w, h, theta]
@@ -32,10 +29,10 @@ class KalmanFilterXYWH(BaseKalmanFilter):
         ]
         if self._is_obb:
             std.insert(4, 1e-2)  # theta
-            std.append(1e-5)     # v_theta
+            std.append(1e-5)  # v_theta
         return std
 
-    def _get_process_noise_std(self, mean: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def _get_process_noise_std(self, mean: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         std_pos = [
             self._std_weight_position * mean[2],
             self._std_weight_position * mean[3],
@@ -64,9 +61,7 @@ class KalmanFilterXYWH(BaseKalmanFilter):
             std_noise.append(1e-1)
         return std_noise
 
-    def _get_multi_process_noise_std(
-        self, mean: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    def _get_multi_process_noise_std(self, mean: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         std_pos = [
             self._std_weight_position * mean[:, 2],
             self._std_weight_position * mean[:, 3],
@@ -85,11 +80,8 @@ class KalmanFilterXYWH(BaseKalmanFilter):
         return std_pos, std_vel
 
     @classmethod
-    def _align_obb_measurement(
-        cls, measurement: np.ndarray, reference: np.ndarray
-    ) -> np.ndarray:
-        """
-        Resolve OBB representation ambiguity before update.
+    def _align_obb_measurement(cls, measurement: np.ndarray, reference: np.ndarray) -> np.ndarray:
+        """Resolve OBB representation ambiguity before update.
 
         A rectangle can be represented by equivalent parameterizations:
         - (w, h, theta)
@@ -133,7 +125,7 @@ class KalmanFilterXYWH(BaseKalmanFilter):
             min_size=1e-4,
         )
 
-    def initiate(self, measurement: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def initiate(self, measurement: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         measurement = np.asarray(measurement, dtype=float).copy()
         if self._is_obb:
             measurement[4] = self._wrap_angle(measurement[4])
@@ -141,14 +133,12 @@ class KalmanFilterXYWH(BaseKalmanFilter):
         mean = self._enforce_xywh_constraints(mean, self._is_obb)
         return mean, covariance
 
-    def predict(self, mean: np.ndarray, covariance: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def predict(self, mean: np.ndarray, covariance: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         mean, covariance = super().predict(mean, covariance)
         mean = self._enforce_xywh_constraints(mean, self._is_obb)
         return mean, covariance
 
-    def multi_predict(
-        self, mean: np.ndarray, covariance: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    def multi_predict(self, mean: np.ndarray, covariance: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         mean, covariance = super().multi_predict(mean, covariance)
         if self._is_obb:
             mean[:, 2] = np.maximum(mean[:, 2], 1e-4)
@@ -165,15 +155,13 @@ class KalmanFilterXYWH(BaseKalmanFilter):
         covariance: np.ndarray,
         measurement: np.ndarray,
         confidence: float = 0.0,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         if self._is_obb:
             mean_arr = np.asarray(mean, dtype=float)
             measurement_arr = np.asarray(measurement, dtype=float).copy()
             if mean_arr.ndim == 2:
                 measurement_arr = measurement_arr.reshape((self.ndim, 1))
-                aligned = self._align_obb_measurement(
-                    measurement_arr[:, 0], mean_arr[:, 0]
-                )
+                aligned = self._align_obb_measurement(measurement_arr[:, 0], mean_arr[:, 0])
                 measurement_arr[:, 0] = aligned
             else:
                 measurement_arr = measurement_arr.reshape((self.ndim,))

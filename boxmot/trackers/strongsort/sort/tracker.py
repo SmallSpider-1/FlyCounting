@@ -1,6 +1,5 @@
 # Mikel Broström 🔥 BoxMOT 🧾 AGPL-3.0 license
 
-from __future__ import absolute_import
 
 import numpy as np
 
@@ -11,28 +10,17 @@ from boxmot.utils.matching import chi2inv95
 
 
 class Tracker:
-    """
-    This is the multi-target tracker.
-    Parameters
-    ----------
-    metric : nn_matching.NearestNeighborDistanceMetric
-        A distance metric for measurement-to-track association.
-    max_age : int
-        Maximum number of missed misses before a track is deleted.
-    n_init : int
-        Number of consecutive detections before the track is confirmed. The
-        track state is set to `Deleted` if a miss occurs within the first
-        `n_init` frames.
-    Attributes
-    ----------
-    metric : nn_matching.NearestNeighborDistanceMetric
-        The distance metric used for measurement to track association.
-    max_age : int
-        Maximum number of missed misses before a track is deleted.
-    n_init : int
-        Number of frames that a track remains in initialization phase.
-    tracks : List[Track]
-        The list of active tracks at the current time step.
+    """This is the multi-target tracker. Parameters. ---------- metric : nn_matching.NearestNeighborDistanceMetric A
+    distance metric for measurement-to-track association. max_age : int Maximum number of missed misses before a
+    track is deleted. n_init : int Number of consecutive detections before the track is confirmed. The track state
+    is set to `Deleted` if a miss occurs within the first `n_init` frames.
+
+    Attributes:
+        ----------
+        metric: nn_matching.NearestNeighborDistanceMetric The distance metric used for measurement to track association.
+        max_age: int Maximum number of missed misses before a track is deleted.
+        n_init: int Number of frames that a track remains in initialization phase.
+        tracks: List[Track] The list of active tracks at the current time step.
     """
 
     GATING_THRESHOLD = np.sqrt(chi2inv95[4])
@@ -79,7 +67,6 @@ class Tracker:
         ----------
         detections : List[deep_sort.detection.Detection]
             A list of detections at the current time step.
-
         """
         # Run matching cascade.
         matches, unmatched_tracks, unmatched_detections = self._match(detections)
@@ -101,9 +88,7 @@ class Tracker:
                 continue
             features += track.features
             targets += [track.id for _ in track.features]
-        self.metric.partial_fit(
-            np.asarray(features), np.asarray(targets), active_targets
-        )
+        self.metric.partial_fit(np.asarray(features), np.asarray(targets), active_targets)
 
     def _match(self, detections):
         def gated_metric(tracks, dets, track_indices, detection_indices):
@@ -139,9 +124,7 @@ class Tracker:
         iou_track_candidates = unconfirmed_tracks + [
             k for k in unmatched_tracks_a if self.tracks[k].time_since_update == 1
         ]
-        unmatched_tracks_a = [
-            k for k in unmatched_tracks_a if self.tracks[k].time_since_update != 1
-        ]
+        unmatched_tracks_a = [k for k in unmatched_tracks_a if self.tracks[k].time_since_update != 1]
 
         matches_b, unmatched_tracks_b, unmatched_detections = linear_assignment.min_cost_matching(
             iou_matching.iou_cost,

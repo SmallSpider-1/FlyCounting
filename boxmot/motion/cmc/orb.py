@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import copy
-from typing import Optional
 
 import cv2
 import numpy as np
@@ -12,9 +11,7 @@ from boxmot.motion.cmc.base_cmc import BaseCMC
 
 
 class ORB(BaseCMC):
-    """
-    FAST + ORB descriptors + BFMatcher (KNN) to estimate a 2x3 affine partial transform.
-    """
+    """FAST + ORB descriptors + BFMatcher (KNN) to estimate a 2x3 affine partial transform."""
 
     def __init__(
         self,
@@ -32,18 +29,18 @@ class ORB(BaseCMC):
         self.extractor = cv2.ORB_create()
         self.matcher = cv2.BFMatcher(int(matcher_norm_type))
 
-        self.prev_img: Optional[np.ndarray] = None
+        self.prev_img: np.ndarray | None = None
         self.prev_keypoints = None
-        self.prev_descriptors: Optional[np.ndarray] = None
-        self.prev_dets: Optional[np.ndarray] = None
+        self.prev_descriptors: np.ndarray | None = None
+        self.prev_dets: np.ndarray | None = None
 
         self.draw_keypoint_matches = bool(draw_keypoint_matches)
         self.align = bool(align)
 
-        self.prev_img_aligned: Optional[np.ndarray] = None
-        self.matches_img: Optional[np.ndarray] = None
+        self.prev_img_aligned: np.ndarray | None = None
+        self.matches_img: np.ndarray | None = None
 
-    def apply(self, img: np.ndarray, dets: Optional[np.ndarray] = None) -> np.ndarray:
+    def apply(self, img: np.ndarray, dets: np.ndarray | None = None) -> np.ndarray:
         H = np.eye(2, 3, dtype=np.float32)
 
         img_p = self.preprocess(img)
@@ -119,7 +116,7 @@ class ORB(BaseCMC):
         prev_pts = np.array([self.prev_keypoints[m.queryIdx].pt for m in good_matches], dtype=np.float32)
         curr_pts = np.array([keypoints[m.trainIdx].pt for m in good_matches], dtype=np.float32)
 
-        H_est, ransac_inliers = cv2.estimateAffinePartial2D(prev_pts, curr_pts, method=cv2.RANSAC)
+        H_est, _ransac_inliers = cv2.estimateAffinePartial2D(prev_pts, curr_pts, method=cv2.RANSAC)
         if H_est is None:
             H_est = H
         else:
@@ -138,7 +135,9 @@ class ORB(BaseCMC):
 
         # optional debug visualization
         if self.draw_keypoint_matches:
-            self.matches_img = self._draw_matches(self.prev_img, img_p, self.prev_keypoints, keypoints, good_matches, dets)
+            self.matches_img = self._draw_matches(
+                self.prev_img, img_p, self.prev_keypoints, keypoints, good_matches, dets
+            )
         else:
             self.matches_img = None
 
@@ -169,7 +168,7 @@ class ORB(BaseCMC):
 
         if dets is not None:
             # draw detections on the right image for context
-            h, w = curr_img.shape[:2]
+            _h, _w = curr_img.shape[:2]
             for det in np.asarray(dets):
                 if len(det) < 4:
                     continue

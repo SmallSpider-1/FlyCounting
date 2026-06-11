@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 from collections import deque
-from typing import Optional, Tuple, Union
 
 import numpy as np
 import scipy.linalg
@@ -23,18 +24,16 @@ chi2inv95 = {
 
 
 class BaseKalmanFilter:
-    """
-    Base class for Kalman filters tracking bounding boxes in image space.
-    """
+    """Base class for Kalman filters tracking bounding boxes in image space."""
 
     def __init__(
         self,
         ndim: int,
         *,
-        dim_x: Optional[int] = None,
-        dim_z: Optional[int] = None,
-        motion_mat: Optional[np.ndarray] = None,
-        update_mat: Optional[np.ndarray] = None,
+        dim_x: int | None = None,
+        dim_z: int | None = None,
+        motion_mat: np.ndarray | None = None,
+        update_mat: np.ndarray | None = None,
         max_obs: int = 50,
     ):
         self.ndim = ndim
@@ -48,11 +47,7 @@ class BaseKalmanFilter:
             if motion_mat is not None
             else self._default_motion_matrix(self.dim_x, self.dim_z)
         )
-        self._update_mat = (
-            update_mat.astype(float).copy()
-            if update_mat is not None
-            else np.eye(self.dim_z, self.dim_x)
-        )
+        self._update_mat = update_mat.astype(float).copy() if update_mat is not None else np.eye(self.dim_z, self.dim_x)
         self.F = self._motion_mat.copy()
         self.H = self._update_mat.copy()
 
@@ -82,7 +77,7 @@ class BaseKalmanFilter:
         self.P_post = self.P.copy()
 
         self.max_obs = max_obs
-        self.history_obs = deque([], maxlen=self.max_obs)
+        self.history_obs = deque(maxlen=self.max_obs)
         self.attr_saved = None
         self.observed = False
         self.last_measurement = None
@@ -96,7 +91,7 @@ class BaseKalmanFilter:
             motion_mat[i, dim_z + i] = 1.0
         return motion_mat
 
-    def _resolve_matrix(self, matrix: Optional[np.ndarray], fallback: np.ndarray) -> np.ndarray:
+    def _resolve_matrix(self, matrix: np.ndarray | None, fallback: np.ndarray) -> np.ndarray:
         return matrix if matrix is not None else fallback
 
     @staticmethod
@@ -109,7 +104,7 @@ class BaseKalmanFilter:
         return measurement
 
     @staticmethod
-    def _wrap_angle(angle: Union[np.ndarray, float]) -> Union[np.ndarray, float]:
+    def _wrap_angle(angle: np.ndarray | float) -> np.ndarray | float:
         wrapped = (np.asarray(angle, dtype=float) + np.pi) % (2.0 * np.pi) - np.pi
         if np.isscalar(angle):
             return float(wrapped)
@@ -127,19 +122,19 @@ class BaseKalmanFilter:
     def _select_obb_candidate(
         cls,
         *,
-        reference_sizes: Tuple[float, float],
+        reference_sizes: tuple[float, float],
         reference_angle: float,
-        candidates: Tuple[Tuple[float, float, float], ...],
+        candidates: tuple[tuple[float, float, float], ...],
         size_weight: float = 0.05,
         eps: float = 1e-6,
-    ) -> Tuple[float, float, float]:
+    ) -> tuple[float, float, float]:
         """Choose equivalent OBB parameterization closest to reference state."""
         ref_s0 = max(float(reference_sizes[0]), eps)
         ref_s1 = max(float(reference_sizes[1]), eps)
         ref_theta = float(reference_angle)
 
         best_cost = float("inf")
-        best: Tuple[float, float, float] = candidates[0]
+        best: tuple[float, float, float] = candidates[0]
         for cand_s0, cand_s1, cand_theta in candidates:
             s0 = max(float(cand_s0), eps)
             s1 = max(float(cand_s1), eps)
@@ -157,8 +152,8 @@ class BaseKalmanFilter:
         cls,
         mean: np.ndarray,
         *,
-        positive_indices: Tuple[int, ...],
-        angle_index: Optional[int] = None,
+        positive_indices: tuple[int, ...],
+        angle_index: int | None = None,
         min_size: float = 1e-4,
     ) -> np.ndarray:
         """Clamp geometry dimensions positive and optionally wrap angle."""
@@ -181,7 +176,7 @@ class BaseKalmanFilter:
         covariance: np.ndarray,
         measurements: np.ndarray,
         project_fn,
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         projected_mean, projected_cov = project_fn(mean, covariance)
         projected_mean = np.asarray(projected_mean, dtype=float).reshape(-1)
         measurements = np.asarray(measurements, dtype=float).copy()
@@ -190,9 +185,7 @@ class BaseKalmanFilter:
         return projected_mean, projected_cov, measurements
 
     @staticmethod
-    def _gating_from_residuals(
-        residuals: np.ndarray, covariance: np.ndarray, metric: str
-    ) -> np.ndarray:
+    def _gating_from_residuals(residuals: np.ndarray, covariance: np.ndarray, metric: str) -> np.ndarray:
         if metric == "gaussian":
             return np.sum(residuals * residuals, axis=1)
         if metric == "maha":
@@ -215,9 +208,7 @@ class BaseKalmanFilter:
             mean[theta_vel_idx] = 0.0
         return mean
 
-    def _damp_theta_velocity(
-        self, mean: np.ndarray, damping: float = 0.8
-    ) -> np.ndarray:
+    def _damp_theta_velocity(self, mean: np.ndarray, damping: float = 0.8) -> np.ndarray:
         """Damp angular velocity to reduce jitter while preserving turn dynamics."""
         theta_vel_idx = self._theta_velocity_index(self.dim_x)
         damping = float(np.clip(damping, 0.0, 1.0))
@@ -227,10 +218,8 @@ class BaseKalmanFilter:
             mean[theta_vel_idx] *= damping
         return mean
 
-    def initiate(self, measurement: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Create track from unassociated measurement.
-        """
+    def initiate(self, measurement: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """Create track from unassociated measurement."""
         mean_pos = measurement
         mean_vel = np.zeros_like(mean_pos)
         mean = np.r_[mean_pos, mean_vel]
@@ -240,51 +229,34 @@ class BaseKalmanFilter:
         return mean, covariance
 
     def _get_initial_covariance_std(self, measurement: np.ndarray) -> np.ndarray:
-        """
-        Return initial standard deviations for the covariance matrix.
-        Should be implemented by subclasses.
+        """Return initial standard deviations for the covariance matrix. Should be implemented by subclasses.
         """
         raise NotImplementedError
 
-    def predict(
-        self, mean: np.ndarray, covariance: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Run Kalman filter prediction step.
-        """
+    def predict(self, mean: np.ndarray, covariance: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """Run Kalman filter prediction step."""
         std_pos, std_vel = self._get_process_noise_std(mean)
         motion_cov = np.diag(np.square(np.r_[std_pos, std_vel]))
 
         mean = np.dot(mean, self._motion_mat.T)
-        covariance = (
-            np.linalg.multi_dot((self._motion_mat, covariance, self._motion_mat.T))
-            + motion_cov
-        )
+        covariance = np.linalg.multi_dot((self._motion_mat, covariance, self._motion_mat.T)) + motion_cov
 
         return mean, covariance
 
-    def _get_process_noise_std(self, mean: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Return standard deviations for process noise.
-        Should be implemented by subclasses.
+    def _get_process_noise_std(self, mean: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """Return standard deviations for process noise. Should be implemented by subclasses.
         """
         raise NotImplementedError
 
-    def _get_measurement_noise_std(
-        self, mean: np.ndarray, confidence: float
-    ) -> np.ndarray:
-        """
-        Return standard deviations for measurement noise.
-        Should be implemented by stateless subclasses.
+    def _get_measurement_noise_std(self, mean: np.ndarray, confidence: float) -> np.ndarray:
+        """Return standard deviations for measurement noise. Should be implemented by stateless subclasses.
         """
         raise NotImplementedError
 
     def project(
         self, mean: np.ndarray, covariance: np.ndarray, confidence: float = 0.0
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Project state distribution to measurement space.
-        """
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Project state distribution to measurement space."""
         std = self._get_measurement_noise_std(mean, confidence)
 
         # NSA Kalman algorithm from GIAOTracker, which proposes a formula to
@@ -299,17 +271,11 @@ class BaseKalmanFilter:
         innovation_cov = np.diag(np.square(std))
 
         mean = np.dot(self._update_mat, mean)
-        covariance = np.linalg.multi_dot(
-            (self._update_mat, covariance, self._update_mat.T)
-        )
+        covariance = np.linalg.multi_dot((self._update_mat, covariance, self._update_mat.T))
         return mean, covariance + innovation_cov
 
-    def multi_predict(
-        self, mean: np.ndarray, covariance: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Run Kalman filter prediction step (Vectorized version).
-        """
+    def multi_predict(self, mean: np.ndarray, covariance: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """Run Kalman filter prediction step (Vectorized version)."""
         std_pos, std_vel = self._get_multi_process_noise_std(mean)
         sqr = np.square(np.r_[std_pos, std_vel]).T
 
@@ -328,15 +294,11 @@ class BaseKalmanFilter:
         covariance: np.ndarray,
         measurement: np.ndarray,
         confidence: float = 0.0,
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Run Kalman filter correction step.
-        """
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Run Kalman filter correction step."""
         projected_mean, projected_cov = self.project(mean, covariance, confidence)
 
-        chol_factor, lower = scipy.linalg.cho_factor(
-            projected_cov, lower=True, check_finite=False
-        )
+        chol_factor, lower = scipy.linalg.cho_factor(projected_cov, lower=True, check_finite=False)
         kalman_gain = scipy.linalg.cho_solve(
             (chol_factor, lower),
             np.dot(covariance, self._update_mat.T).T,
@@ -345,30 +307,22 @@ class BaseKalmanFilter:
         innovation = measurement - projected_mean
 
         new_mean = mean + np.dot(innovation, kalman_gain.T)
-        new_covariance = covariance - np.linalg.multi_dot(
-            (kalman_gain, projected_cov, kalman_gain.T)
-        )
+        new_covariance = covariance - np.linalg.multi_dot((kalman_gain, projected_cov, kalman_gain.T))
         return new_mean, new_covariance
 
-    def _get_multi_process_noise_std(
-        self, mean: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Return standard deviations for process noise in vectorized form.
-        Should be implemented by subclasses.
+    def _get_multi_process_noise_std(self, mean: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """Return standard deviations for process noise in vectorized form. Should be implemented by subclasses.
         """
         raise NotImplementedError
 
     def predict_state(
         self,
-        u: Optional[np.ndarray] = None,
-        B: Optional[np.ndarray] = None,
-        F: Optional[np.ndarray] = None,
-        Q: Optional[np.ndarray] = None,
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Stateful predict step for matrix-based filters.
-        """
+        u: np.ndarray | None = None,
+        B: np.ndarray | None = None,
+        F: np.ndarray | None = None,
+        Q: np.ndarray | None = None,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Stateful predict step for matrix-based filters."""
         B = self._resolve_matrix(B, self.B)
         F = self._resolve_matrix(F, self.F)
         Q = self._resolve_matrix(Q, self.Q)
@@ -388,14 +342,12 @@ class BaseKalmanFilter:
 
     def project_state(
         self,
-        x: Optional[np.ndarray] = None,
-        P: Optional[np.ndarray] = None,
-        H: Optional[np.ndarray] = None,
-        R: Optional[np.ndarray] = None,
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Project a state distribution into measurement space.
-        """
+        x: np.ndarray | None = None,
+        P: np.ndarray | None = None,
+        H: np.ndarray | None = None,
+        R: np.ndarray | None = None,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Project a state distribution into measurement space."""
         state = self.x if x is None else x
         covariance = self.P if P is None else P
         H = self._resolve_matrix(H, self.H)
@@ -410,12 +362,10 @@ class BaseKalmanFilter:
     def update_state(
         self,
         z: np.ndarray,
-        R: Optional[np.ndarray] = None,
-        H: Optional[np.ndarray] = None,
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Stateful update step for matrix-based filters.
-        """
+        R: np.ndarray | None = None,
+        H: np.ndarray | None = None,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Stateful update step for matrix-based filters."""
         H = self._resolve_matrix(H, self.H)
         R = self._resolve_matrix(R, self.R)
         if np.isscalar(R):
@@ -424,9 +374,7 @@ class BaseKalmanFilter:
         measurement = self._reshape_measurement(z, self.dim_z)
         projected_mean, projected_cov = self.project_state(H=H, R=R)
 
-        chol_factor, lower = scipy.linalg.cho_factor(
-            projected_cov, lower=True, check_finite=False
-        )
+        chol_factor, lower = scipy.linalg.cho_factor(projected_cov, lower=True, check_finite=False)
         self.K = scipy.linalg.cho_solve(
             (chol_factor, lower),
             np.dot(self.P, H.T).T,
@@ -434,9 +382,7 @@ class BaseKalmanFilter:
         ).T
         self.y = measurement - projected_mean
         self.S = projected_cov
-        self.SI = scipy.linalg.cho_solve(
-            (chol_factor, lower), np.eye(self.dim_z), check_finite=False
-        )
+        self.SI = scipy.linalg.cho_solve((chol_factor, lower), np.eye(self.dim_z), check_finite=False)
 
         self.x = self.x + np.dot(self.K, self.y)
         self.P = self.P - np.linalg.multi_dot((self.K, projected_cov, self.K.T))
@@ -448,12 +394,10 @@ class BaseKalmanFilter:
     def mahalanobis_distance(
         self,
         z: np.ndarray,
-        H: Optional[np.ndarray] = None,
-        R: Optional[np.ndarray] = None,
+        H: np.ndarray | None = None,
+        R: np.ndarray | None = None,
     ) -> float:
-        """
-        Compute Mahalanobis distance for a candidate measurement.
-        """
+        """Compute Mahalanobis distance for a candidate measurement."""
         measurement = self._reshape_measurement(z, self.dim_z)
         projected_mean, projected_cov = self.project_state(H=H, R=R)
         innovation = measurement - projected_mean
@@ -474,9 +418,7 @@ class BaseKalmanFilter:
         only_position: bool = False,
         metric: str = "maha",
     ) -> np.ndarray:
-        """
-        Compute gating distance between state distribution and measurements.
-        """
+        """Compute gating distance between state distribution and measurements."""
         mean, covariance = self.project(mean, covariance)
 
         if only_position:
@@ -488,9 +430,7 @@ class BaseKalmanFilter:
             return np.sum(d * d, axis=1)
         elif metric == "maha":
             cholesky_factor = np.linalg.cholesky(covariance)
-            z = scipy.linalg.solve_triangular(
-                cholesky_factor, d.T, lower=True, check_finite=False, overwrite_b=True
-            )
+            z = scipy.linalg.solve_triangular(cholesky_factor, d.T, lower=True, check_finite=False, overwrite_b=True)
             squared_maha = np.sum(z * z, axis=0)
             return squared_maha
         else:

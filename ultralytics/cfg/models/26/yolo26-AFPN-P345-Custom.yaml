@@ -30,4 +30,4 @@ backbone:
 
 # YOLO26n head
 head:
-  - [[4, 6, 10], 1, Detect_AFPN_P345_Custom, [nc, 128, 'C3k2']] # Detect(P3, P4, P5)
+  - [[4, 6, 10], 1, Detect_AFPN_P345_Custom, [nc, 128, "C3k2"]] # Detect(P3, P4, P5)
