@@ -18,18 +18,10 @@
       "loss": 0.0013534138368448644,
       "postprocess": 0.0691323442282784
     },
-    "class_precision": [
-      0.9565869252448298
-    ],
-    "class_recall": [
-      0.6885802108713548
-    ],
-    "class_map50": [
-      0.8724070023413397
-    ],
-    "class_map50_95": [
-      0.6461376422169784
-    ]
+    "class_precision": [0.9565869252448298],
+    "class_recall": [0.6885802108713548],
+    "class_map50": [0.8724070023413397],
+    "class_map50_95": [0.6461376422169784]
   },
   "save_dir": "/home/admin1/Projects/ultralytics-main/yolo26_pruning/performance_results/val_yolo26n_structured_pruned_0.20_20260514_192659"
 }
