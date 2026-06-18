@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import copy
-from typing import Optional
 
 import cv2
 import numpy as np
@@ -12,9 +11,7 @@ from boxmot.motion.cmc.base_cmc import BaseCMC
 
 
 class SIFT(BaseCMC):
-    """
-    SIFT keypoints + BFMatcher(L2) to estimate a 2x3 affine partial transform.
-    """
+    """SIFT keypoints + BFMatcher(L2) to estimate a 2x3 affine partial transform."""
 
     def __init__(
         self,
@@ -34,18 +31,18 @@ class SIFT(BaseCMC):
         self.extractor = cv2.SIFT_create(nOctaveLayers=2, contrastThreshold=0.5, edgeThreshold=10)
         self.matcher = cv2.BFMatcher(cv2.NORM_L2)
 
-        self.prev_img: Optional[np.ndarray] = None
+        self.prev_img: np.ndarray | None = None
         self.prev_keypoints = None
-        self.prev_descriptors: Optional[np.ndarray] = None
-        self.prev_dets: Optional[np.ndarray] = None
+        self.prev_descriptors: np.ndarray | None = None
+        self.prev_dets: np.ndarray | None = None
 
         self.draw_keypoint_matches = bool(draw_keypoint_matches)
         self.align = bool(align)
 
-        self.prev_img_aligned: Optional[np.ndarray] = None
-        self.matches_img: Optional[np.ndarray] = None
+        self.prev_img_aligned: np.ndarray | None = None
+        self.matches_img: np.ndarray | None = None
 
-    def apply(self, img: np.ndarray, dets: Optional[np.ndarray] = None) -> np.ndarray:
+    def apply(self, img: np.ndarray, dets: np.ndarray | None = None) -> np.ndarray:
         H = np.eye(2, 3, dtype=np.float32)
 
         img_p = self.preprocess(img)
@@ -115,7 +112,7 @@ class SIFT(BaseCMC):
         prev_pts = np.array([self.prev_keypoints[m.queryIdx].pt for m in good_matches], dtype=np.float32)
         curr_pts = np.array([keypoints[m.trainIdx].pt for m in good_matches], dtype=np.float32)
 
-        H_est, ransac_inliers = cv2.estimateAffinePartial2D(prev_pts, curr_pts, method=cv2.RANSAC)
+        H_est, _ransac_inliers = cv2.estimateAffinePartial2D(prev_pts, curr_pts, method=cv2.RANSAC)
         if H_est is None:
             H_est = H
         else:
@@ -132,7 +129,14 @@ class SIFT(BaseCMC):
                 self.prev_img_aligned = None
 
         if self.draw_keypoint_matches:
-            self.matches_img = ORBLikeDraw.draw(prev=self.prev_img, curr=img_p, prev_kp=self.prev_keypoints, curr_kp=keypoints, matches=good_matches, dets=dets)
+            self.matches_img = ORBLikeDraw.draw(
+                prev=self.prev_img,
+                curr=img_p,
+                prev_kp=self.prev_keypoints,
+                curr_kp=keypoints,
+                matches=good_matches,
+                dets=dets,
+            )
         else:
             self.matches_img = None
 

@@ -3,9 +3,7 @@ import numpy as np
 
 
 def iou_obb_pair(i, j, bboxes1, bboxes2):
-    """
-    Compute IoU for the rotated rectangles at index i and j in the batches `bboxes1`, `bboxes2` .
-    """
+    """Compute IoU for the rotated rectangles at index i and j in the batches `bboxes1`, `bboxes2` ."""
     rect1 = np.asarray(bboxes1[int(i)], dtype=float).reshape(-1)
     rect2 = np.asarray(bboxes2[int(j)], dtype=float).reshape(-1)
 
@@ -37,9 +35,8 @@ def iou_obb_pair(i, j, bboxes1, bboxes2):
 
 class AssociationFunction:
     def __init__(self, w, h, asso_mode="iou"):
-        """
-        Initializes the AssociationFunction class with the necessary parameters for bounding box operations.
-        The association function is selected based on the `asso_mode` string provided during class creation.
+        """Initializes the AssociationFunction class with the necessary parameters for bounding box operations. The
+        association function is selected based on the `asso_mode` string provided during class creation.
 
         Parameters:
         w (int): The width of the frame, used for normalizing centroid distance.
@@ -81,9 +78,8 @@ class AssociationFunction:
 
     @staticmethod
     def hmiou_batch(bboxes1, bboxes2):
-        """
-        Compute a modified Intersection over Union (hIoU) between two batches of bounding boxes,
-        incorporating a vertical overlap ratio.
+        """Compute a modified Intersection over Union (hIoU) between two batches of bounding boxes, incorporating a
+        vertical overlap ratio.
 
         Parameters:
         - bboxes1: (N, 4) array of bounding boxes [x1, y1, x2, y2]
@@ -172,10 +168,12 @@ class AssociationFunction:
         return giou
 
     def centroid_batch(self, bboxes1, bboxes2) -> np.ndarray:
-        centroids1 = np.stack(((bboxes1[..., 0] + bboxes1[..., 2]) / 2,
-                               (bboxes1[..., 1] + bboxes1[..., 3]) / 2), axis=-1)
-        centroids2 = np.stack(((bboxes2[..., 0] + bboxes2[..., 2]) / 2,
-                               (bboxes2[..., 1] + bboxes2[..., 3]) / 2), axis=-1)
+        centroids1 = np.stack(
+            ((bboxes1[..., 0] + bboxes1[..., 2]) / 2, (bboxes1[..., 1] + bboxes1[..., 3]) / 2), axis=-1
+        )
+        centroids2 = np.stack(
+            ((bboxes2[..., 0] + bboxes2[..., 2]) / 2, (bboxes2[..., 1] + bboxes2[..., 3]) / 2), axis=-1
+        )
 
         centroids1 = np.expand_dims(centroids1, 1)
         centroids2 = np.expand_dims(centroids2, 0)
@@ -311,8 +309,7 @@ class AssociationFunction:
 
     @staticmethod
     def run_asso_func(self, bboxes1, bboxes2):
-        """
-        Runs the selected association function (based on the initialization string) on the input bounding boxes.
+        """Runs the selected association function (based on the initialization string) on the input bounding boxes.
 
         Parameters:
         bboxes1: First set of bounding boxes.
@@ -321,14 +318,13 @@ class AssociationFunction:
         return self.asso_func(bboxes1, bboxes2)
 
     def _get_asso_func(self, asso_mode):
-        """
-        Returns the corresponding association function based on the provided mode string.
+        """Returns the corresponding association function based on the provided mode string.
 
         Parameters:
         asso_mode (str): The association function to use (e.g., "iou", "giou", "centroid", etc.).
 
         Returns:
-        function: The appropriate function for the association calculation.
+            function: The appropriate function for the association calculation.
         """
         ASSO_FUNCS = {
             "iou": AssociationFunction.iou_batch,
@@ -342,8 +338,6 @@ class AssociationFunction:
         }
 
         if asso_mode not in ASSO_FUNCS:
-            raise ValueError(
-                f"Invalid association mode: {asso_mode}. Choose from {list(ASSO_FUNCS.keys())}"
-            )
+            raise ValueError(f"Invalid association mode: {asso_mode}. Choose from {list(ASSO_FUNCS.keys())}")
 
         return ASSO_FUNCS[asso_mode]

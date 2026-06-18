@@ -18,9 +18,7 @@ class GatedMLP(nn.Module):
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
         out_features = out_features if out_features is not None else in_features
-        hidden_features = (
-            hidden_features if hidden_features is not None else int(8 * in_features / 3)
-        )
+        hidden_features = hidden_features if hidden_features is not None else int(8 * in_features / 3)
         hidden_features = (hidden_features + multiple_of - 1) // multiple_of * multiple_of
         self.fc1 = nn.Linear(in_features, 2 * hidden_features, bias=bias, **factory_kwargs)
         self.activation = activation

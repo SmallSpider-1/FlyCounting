@@ -33,9 +33,9 @@ backbone:
 
 # YOLO26n head
 head:
-  - [4, 1, Conv, [head_channel]]  # 11-P3/8
-  - [6, 1, Conv, [head_channel]]  # 12-P4/16
-  - [10, 1, Conv, [head_channel]]  # 13-P5/32
+  - [4, 1, Conv, [head_channel]] # 11-P3/8
+  - [6, 1, Conv, [head_channel]] # 12-P4/16
+  - [10, 1, Conv, [head_channel]] # 13-P5/32
 
   - [12, 1, Conv, [head_channel, 3, 2]] # 14-P5/32
   - [[-1, 13], 1, Fusion, [fusion_mode]] # 15

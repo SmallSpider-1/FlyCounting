@@ -3,10 +3,25 @@ import torch.nn as nn
 
 
 class KANConvNDLayer(nn.Module):
-    def __init__(self, conv_class, norm_class, input_dim, output_dim, spline_order, kernel_size,
-                 groups=1, padding=0, stride=1, dilation=1,
-                 ndim: int = 2, grid_size=5, base_activation=nn.GELU, grid_range=[-1, 1], dropout=0.0):
-        super(KANConvNDLayer, self).__init__()
+    def __init__(
+        self,
+        conv_class,
+        norm_class,
+        input_dim,
+        output_dim,
+        spline_order,
+        kernel_size,
+        groups=1,
+        padding=0,
+        stride=1,
+        dilation=1,
+        ndim: int = 2,
+        grid_size=5,
+        base_activation=nn.GELU,
+        grid_range=[-1, 1],
+        dropout=0.0,
+    ):
+        super().__init__()
         self.inputdim = input_dim
         self.outdim = output_dim
         self.spline_order = spline_order
@@ -29,29 +44,43 @@ class KANConvNDLayer(nn.Module):
             if ndim == 3:
                 self.dropout = nn.Dropout3d(p=dropout)
         if groups <= 0:
-            raise ValueError('groups must be a positive integer')
+            raise ValueError("groups must be a positive integer")
         if input_dim % groups != 0:
-            raise ValueError('input_dim must be divisible by groups')
+            raise ValueError("input_dim must be divisible by groups")
         if output_dim % groups != 0:
-            raise ValueError('output_dim must be divisible by groups')
+            raise ValueError("output_dim must be divisible by groups")
 
-        self.base_conv = nn.ModuleList([conv_class(input_dim // groups,
-                                                   output_dim // groups,
-                                                   kernel_size,
-                                                   stride,
-                                                   padding,
-                                                   dilation,
-                                                   groups=1,
-                                                   bias=False) for _ in range(groups)])
+        self.base_conv = nn.ModuleList(
+            [
+                conv_class(
+                    input_dim // groups,
+                    output_dim // groups,
+                    kernel_size,
+                    stride,
+                    padding,
+                    dilation,
+                    groups=1,
+                    bias=False,
+                )
+                for _ in range(groups)
+            ]
+        )
 
-        self.spline_conv = nn.ModuleList([conv_class((grid_size + spline_order) * input_dim // groups,
-                                                     output_dim // groups,
-                                                     kernel_size,
-                                                     stride,
-                                                     padding,
-                                                     dilation,
-                                                     groups=1,
-                                                     bias=False) for _ in range(groups)])
+        self.spline_conv = nn.ModuleList(
+            [
+                conv_class(
+                    (grid_size + spline_order) * input_dim // groups,
+                    output_dim // groups,
+                    kernel_size,
+                    stride,
+                    padding,
+                    dilation,
+                    groups=1,
+                    bias=False,
+                )
+                for _ in range(groups)
+            ]
+        )
 
         self.layer_norm = nn.ModuleList([norm_class(output_dim // groups) for _ in range(groups)])
 
@@ -62,14 +91,14 @@ class KANConvNDLayer(nn.Module):
             self.grid_range[0] - h * spline_order,
             self.grid_range[1] + h * spline_order,
             grid_size + 2 * spline_order + 1,
-            dtype=torch.float32
+            dtype=torch.float32,
         )
         # Initialize weights using Kaiming uniform distribution for better training start
         for conv_layer in self.base_conv:
-            nn.init.kaiming_uniform_(conv_layer.weight, nonlinearity='linear')
+            nn.init.kaiming_uniform_(conv_layer.weight, nonlinearity="linear")
 
         for conv_layer in self.spline_conv:
-            nn.init.kaiming_uniform_(conv_layer.weight, nonlinearity='linear')
+            nn.init.kaiming_uniform_(conv_layer.weight, nonlinearity="linear")
 
     def forward_kan(self, x, group_index):
 
@@ -79,18 +108,32 @@ class KANConvNDLayer(nn.Module):
         x_uns = x.unsqueeze(-1)  # Expand dimensions for spline operations.
         # Compute the basis for the spline using intervals and input values.
         target = x.shape[1:] + self.grid.shape
-        grid = self.grid.view(*list([1 for _ in range(self.ndim + 1)] + [-1, ])).expand(target).contiguous().to(x.device)
+        grid = (
+            self.grid.view(
+                *list(
+                    [1 for _ in range(self.ndim + 1)]
+                    + [
+                        -1,
+                    ]
+                )
+            )
+            .expand(target)
+            .contiguous()
+            .to(x.device)
+        )
 
         bases = ((x_uns >= grid[..., :-1]) & (x_uns < grid[..., 1:])).to(x.dtype)
 
         # Compute the spline basis over multiple orders.
         for k in range(1, self.spline_order + 1):
-            left_intervals = grid[..., :-(k + 1)]
+            left_intervals = grid[..., : -(k + 1)]
             right_intervals = grid[..., k:-1]
-            delta = torch.where(right_intervals == left_intervals, torch.ones_like(right_intervals),
-                                right_intervals - left_intervals)
-            bases = ((x_uns - left_intervals) / delta * bases[..., :-1]) + \
-                    ((grid[..., k + 1:] - x_uns) / (grid[..., k + 1:] - grid[..., 1:(-k)]) * bases[..., 1:])
+            delta = torch.where(
+                right_intervals == left_intervals, torch.ones_like(right_intervals), right_intervals - left_intervals
+            )
+            bases = ((x_uns - left_intervals) / delta * bases[..., :-1]) + (
+                (grid[..., k + 1 :] - x_uns) / (grid[..., k + 1 :] - grid[..., 1:(-k)]) * bases[..., 1:]
+            )
         bases = bases.contiguous()
         bases = bases.moveaxis(-1, 2).flatten(1, 2)
         spline_output = self.spline_conv[group_index](bases)
@@ -112,36 +155,105 @@ class KANConvNDLayer(nn.Module):
 
 
 class KANConv3DLayer(KANConvNDLayer):
-    def __init__(self, input_dim, output_dim, kernel_size, spline_order=3, groups=1, padding=0, stride=1, dilation=1,
-                 grid_size=5, base_activation=nn.GELU, grid_range=[-1, 1], dropout=0.0):
-        super(KANConv3DLayer, self).__init__(nn.Conv3d, nn.InstanceNorm3d,
-                                             input_dim, output_dim,
-                                             spline_order, kernel_size,
-                                             groups=groups, padding=padding, stride=stride, dilation=dilation,
-                                             ndim=3,
-                                             grid_size=grid_size, base_activation=base_activation,
-                                             grid_range=grid_range, dropout=dropout)
+    def __init__(
+        self,
+        input_dim,
+        output_dim,
+        kernel_size,
+        spline_order=3,
+        groups=1,
+        padding=0,
+        stride=1,
+        dilation=1,
+        grid_size=5,
+        base_activation=nn.GELU,
+        grid_range=[-1, 1],
+        dropout=0.0,
+    ):
+        super().__init__(
+            nn.Conv3d,
+            nn.InstanceNorm3d,
+            input_dim,
+            output_dim,
+            spline_order,
+            kernel_size,
+            groups=groups,
+            padding=padding,
+            stride=stride,
+            dilation=dilation,
+            ndim=3,
+            grid_size=grid_size,
+            base_activation=base_activation,
+            grid_range=grid_range,
+            dropout=dropout,
+        )
 
 
 class KANConv2DLayer(KANConvNDLayer):
-    def __init__(self, input_dim, output_dim, kernel_size, spline_order=3, groups=1, padding=0, stride=1, dilation=1,
-                 grid_size=5, base_activation=nn.GELU, grid_range=[-1, 1], dropout=0.0):
-        super(KANConv2DLayer, self).__init__(nn.Conv2d, nn.InstanceNorm2d,
-                                             input_dim, output_dim,
-                                             spline_order, kernel_size,
-                                             groups=groups, padding=padding, stride=stride, dilation=dilation,
-                                             ndim=2,
-                                             grid_size=grid_size, base_activation=base_activation,
-                                             grid_range=grid_range, dropout=dropout)
+    def __init__(
+        self,
+        input_dim,
+        output_dim,
+        kernel_size,
+        spline_order=3,
+        groups=1,
+        padding=0,
+        stride=1,
+        dilation=1,
+        grid_size=5,
+        base_activation=nn.GELU,
+        grid_range=[-1, 1],
+        dropout=0.0,
+    ):
+        super().__init__(
+            nn.Conv2d,
+            nn.InstanceNorm2d,
+            input_dim,
+            output_dim,
+            spline_order,
+            kernel_size,
+            groups=groups,
+            padding=padding,
+            stride=stride,
+            dilation=dilation,
+            ndim=2,
+            grid_size=grid_size,
+            base_activation=base_activation,
+            grid_range=grid_range,
+            dropout=dropout,
+        )
 
 
 class KANConv1DLayer(KANConvNDLayer):
-    def __init__(self, input_dim, output_dim, kernel_size, spline_order=3, groups=1, padding=0, stride=1, dilation=1,
-                 grid_size=5, base_activation=nn.GELU, grid_range=[-1, 1], dropout=0.0):
-        super(KANConv1DLayer, self).__init__(nn.Conv1d, nn.InstanceNorm1d,
-                                             input_dim, output_dim,
-                                             spline_order, kernel_size,
-                                             groups=groups, padding=padding, stride=stride, dilation=dilation,
-                                             ndim=1,
-                                             grid_size=grid_size, base_activation=base_activation,
-                                             grid_range=grid_range, dropout=dropout)
+    def __init__(
+        self,
+        input_dim,
+        output_dim,
+        kernel_size,
+        spline_order=3,
+        groups=1,
+        padding=0,
+        stride=1,
+        dilation=1,
+        grid_size=5,
+        base_activation=nn.GELU,
+        grid_range=[-1, 1],
+        dropout=0.0,
+    ):
+        super().__init__(
+            nn.Conv1d,
+            nn.InstanceNorm1d,
+            input_dim,
+            output_dim,
+            spline_order,
+            kernel_size,
+            groups=groups,
+            padding=padding,
+            stride=stride,
+            dilation=dilation,
+            ndim=1,
+            grid_size=grid_size,
+            base_activation=base_activation,
+            grid_range=grid_range,
+            dropout=dropout,
+        )
