@@ -1,13 +1,14 @@
+from __future__ import annotations
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Union, Tuple
+
 
 class SEBlock(nn.Module):
     """Squeeze and Excite module.
 
-    Pytorch implementation of `Squeeze-and-Excitation Networks` -
-    https://arxiv.org/pdf/1709.01507.pdf
+    Pytorch implementation of `Squeeze-and-Excitation Networks` - https://arxiv.org/pdf/1709.01507.pdf
     """
 
     def __init__(self, in_channels: int, rd_ratio: float = 0.0625) -> None:
@@ -17,7 +18,7 @@ class SEBlock(nn.Module):
             in_channels: Number of input channels.
             rd_ratio: Input channel reduction ratio.
         """
-        super(SEBlock, self).__init__()
+        super().__init__()
         self.reduce = nn.Conv2d(
             in_channels=in_channels,
             out_channels=int(in_channels * rd_ratio),
@@ -35,7 +36,7 @@ class SEBlock(nn.Module):
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         """Apply forward pass."""
-        b, c, h, w = inputs.size()
+        _b, c, h, w = inputs.size()
         x = F.avg_pool2d(inputs, kernel_size=[h, w])
         x = self.reduce(x)
         x = F.relu(x)
@@ -44,13 +45,12 @@ class SEBlock(nn.Module):
         x = x.view(-1, c, 1, 1)
         return inputs * x
 
+
 class MobileOneBlock(nn.Module):
     """MobileOne building block.
 
-    This block has a multi-branched architecture at train-time
-    and plain-CNN style architecture at inference time
-    For more details, please refer to our paper:
-    `An Improved One millisecond Mobile Backbone` -
+    This block has a multi-branched architecture at train-time and plain-CNN style architecture at inference time For
+    more details, please refer to our paper: `An Improved One millisecond Mobile Backbone` -
     https://arxiv.org/pdf/2206.04040.pdf
     """
 
@@ -86,7 +86,7 @@ class MobileOneBlock(nn.Module):
             use_scale_branch: Whether to use scale branch. Default: ``True``
             num_conv_branches: Number of linear conv branches.
         """
-        super(MobileOneBlock, self).__init__()
+        super().__init__()
         self.inference_mode = inference_mode
         self.groups = groups
         self.stride = stride
@@ -122,18 +122,14 @@ class MobileOneBlock(nn.Module):
         else:
             # Re-parameterizable skip connection
             self.rbr_skip = (
-                nn.BatchNorm2d(num_features=in_channels)
-                if out_channels == in_channels and stride == 1
-                else None
+                nn.BatchNorm2d(num_features=in_channels) if out_channels == in_channels and stride == 1 else None
             )
 
             # Re-parameterizable conv branches
             if num_conv_branches > 0:
                 rbr_conv = list()
                 for _ in range(self.num_conv_branches):
-                    rbr_conv.append(
-                        self._conv_bn(kernel_size=kernel_size, padding=padding)
-                    )
+                    rbr_conv.append(self._conv_bn(kernel_size=kernel_size, padding=padding))
                 self.rbr_conv = nn.ModuleList(rbr_conv)
             else:
                 self.rbr_conv = None
@@ -171,10 +167,9 @@ class MobileOneBlock(nn.Module):
         return self.activation(self.se(out))
 
     def switch_to_deploy(self):
-        """Following works like `RepVGG: Making VGG-style ConvNets Great Again` -
-        https://arxiv.org/pdf/2101.03697.pdf. We re-parameterize multi-branched
-        architecture used at training time to obtain a plain CNN-like structure
-        for inference.
+        """Following works like `RepVGG: Making VGG-style ConvNets Great Again` - https://arxiv.org/pdf/2101.03697.pdf.
+        We re-parameterize multi-branched architecture used at training time to obtain a plain CNN-like
+        structure for inference.
         """
         if self.inference_mode:
             return
@@ -202,9 +197,9 @@ class MobileOneBlock(nn.Module):
 
         self.inference_mode = True
 
-    def _get_kernel_bias(self) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Method to obtain re-parameterized kernel and bias.
-        Reference: https://github.com/DingXiaoH/RepVGG/blob/main/repvgg.py#L83
+    def _get_kernel_bias(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """Method to obtain re-parameterized kernel and bias. Reference:
+        https://github.com/DingXiaoH/RepVGG/blob/main/repvgg.py#L83.
 
         Returns:
             Tuple of (kernel, bias) after fusing branches.
@@ -237,11 +232,9 @@ class MobileOneBlock(nn.Module):
         bias_final = bias_conv + bias_scale + bias_identity
         return kernel_final, bias_final
 
-    def _fuse_bn_tensor(
-        self, branch: Union[nn.Sequential, nn.BatchNorm2d]
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Method to fuse batchnorm layer with preceeding conv layer.
-        Reference: https://github.com/DingXiaoH/RepVGG/blob/main/repvgg.py#L95
+    def _fuse_bn_tensor(self, branch: nn.Sequential | nn.BatchNorm2d) -> tuple[torch.Tensor, torch.Tensor]:
+        """Method to fuse batchnorm layer with preceeding conv layer. Reference:
+        https://github.com/DingXiaoH/RepVGG/blob/main/repvgg.py#L95.
 
         Args:
             branch: Sequence of ops to be fused.
@@ -271,9 +264,7 @@ class MobileOneBlock(nn.Module):
                     device=branch.weight.device,
                 )
                 for i in range(self.in_channels):
-                    kernel_value[
-                        i, i % input_dim, kernel_size[0] // 2, kernel_size[1] // 2
-                    ] = 1
+                    kernel_value[i, i % input_dim, kernel_size[0] // 2, kernel_size[1] // 2] = 1
                 self.id_tensor = kernel_value
             kernel = self.id_tensor
             running_mean = branch.running_mean
@@ -311,6 +302,7 @@ class MobileOneBlock(nn.Module):
         mod_list.add_module("bn", nn.BatchNorm2d(num_features=self.out_channels))
         return mod_list
 
+
 class RepStem(nn.Module):
     def __init__(self, inc, ouc) -> None:
         super().__init__()
@@ -318,6 +310,6 @@ class RepStem(nn.Module):
         self.conv1 = MobileOneBlock(inc, ouc, 3, 2, 1, use_se=False)
         self.conv2 = MobileOneBlock(ouc, ouc, 3, 2, 1, groups=ouc, use_se=False)
         self.conv3 = MobileOneBlock(ouc, ouc, 1, 1, use_se=False)
-    
+
     def forward(self, x):
         return self.conv3(self.conv2(self.conv1(x)))

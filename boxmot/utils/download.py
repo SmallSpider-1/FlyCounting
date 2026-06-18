@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Utility script to download and extract BoxMOT releases and MOT evaluation tools.
-"""
+"""Utility script to download and extract BoxMOT releases and MOT evaluation tools."""
+
+from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Optional
 from zipfile import BadZipFile, ZipFile
 
 import gdown
@@ -28,7 +26,7 @@ def get_http_session(retries: int = 3, backoff_factor: float = 0.3) -> requests.
         total=retries,
         status_forcelist=[429, 500, 502, 503, 504],
         allowed_methods=["GET", "POST"],
-        backoff_factor=backoff_factor
+        backoff_factor=backoff_factor,
     )
     adapter = HTTPAdapter(max_retries=retry_strategy)
     session.mount("https://", adapter)
@@ -37,9 +35,8 @@ def get_http_session(retries: int = 3, backoff_factor: float = 0.3) -> requests.
 
 
 def download_file(url: str, dest: Path, chunk_size: int = 8192, overwrite: bool = False, timeout: int = 10) -> Path:
-    """
-    Download a file from a URL to a destination path, with progress and logging.
-    Returns the path to the downloaded file.
+    """Download a file from a URL to a destination path, with progress and logging. Returns the path to the downloaded
+    file.
     """
     if dest.exists() and not overwrite:
         LOGGER.debug(f"Cached: {dest.name}")
@@ -51,12 +48,7 @@ def download_file(url: str, dest: Path, chunk_size: int = 8192, overwrite: bool 
 
     if "drive.google.com" in url or "drive.usercontent.google.com" in url:
         # Google Drive: use gdown (handles confirm tokens automatically)
-        gdown.download(
-            url=url,
-            output=str(dest),
-            quiet=False,
-            fuzzy=True
-        )
+        gdown.download(url=url, output=str(dest), quiet=False, fuzzy=True)
     else:
         session = get_http_session()
         response = session.get(url, stream=True, timeout=timeout)
@@ -65,10 +57,7 @@ def download_file(url: str, dest: Path, chunk_size: int = 8192, overwrite: bool 
         total = int(response.headers.get("Content-Length", 0))
 
         with open(dest, "wb") as f, tqdm(
-            total=total,
-            unit="B",
-            unit_scale=True,
-            desc=f"Downloading {dest.name}"
+            total=total, unit="B", unit_scale=True, desc=f"Downloading {dest.name}"
         ) as pbar:
             for chunk in response.iter_content(chunk_size=chunk_size):
                 if chunk:
@@ -79,14 +68,12 @@ def download_file(url: str, dest: Path, chunk_size: int = 8192, overwrite: bool 
 
 
 def extract_zip(zip_path: Path, extract_to: Path, overwrite: bool = False) -> None:
-    """
-    Extract a ZIP archive to a target directory.
-    """
+    """Extract a ZIP archive to a target directory."""
     if not zip_path.is_file():
         raise FileNotFoundError(f"ZIP file not found: {zip_path}")
 
     try:
-        with ZipFile(zip_path, 'r') as zf:
+        with ZipFile(zip_path, "r") as zf:
             members = zf.infolist()
             total_files = len(members)
 
@@ -128,8 +115,7 @@ def patch_deprecated_types(root: Path, deprecated: dict = DEPRECATED_TYPES) -> N
 
 
 def download_trackeval(dest: Path, branch: str = "master", overwrite: bool = False) -> None:
-    """
-    Download and set up the TrackEval repository into the given destination folder.
+    """Download and set up the TrackEval repository into the given destination folder.
 
     Args:
         dest (Path): target directory for TrackEval (e.g. boxmot/engine/trackeval)
@@ -152,7 +138,7 @@ def download_trackeval(dest: Path, branch: str = "master", overwrite: bool = Fal
     # Extract into the parent folder
     extract_zip(zip_path, dest.parent, overwrite=overwrite)
 
-    # GitHub will unpack to "TrackEval-master" (with original casing); 
+    # GitHub will unpack to "TrackEval-master" (with original casing);
     # rename it case-insensitively to our lowercase 'trackeval' folder
     extracted = None
     for d in dest.parent.iterdir():
@@ -176,10 +162,9 @@ def download_trackeval(dest: Path, branch: str = "master", overwrite: bool = Fal
 
     LOGGER.debug("TrackEval setup complete")
 
-    
+
 def download_hf_dataset(repo_id: str, dest: Path, overwrite: bool = False) -> None:
-    """
-    Download a dataset from HuggingFace Hub to the given destination.
+    """Download a dataset from HuggingFace Hub to the given destination.
 
     Requires ``huggingface_hub`` to be installed (``pip install huggingface_hub``).
 
@@ -195,28 +180,29 @@ def download_hf_dataset(repo_id: str, dest: Path, overwrite: bool = False) -> No
     try:
         from huggingface_hub import HfApi, snapshot_download
     except ImportError:
-        import subprocess, sys
+        import subprocess
+        import sys
+
         LOGGER.info("Installing huggingface_hub ...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "huggingface_hub"])
         from huggingface_hub import HfApi, snapshot_download
 
-    from tqdm.auto import tqdm as base_tqdm
     from huggingface_hub.hf_api import RepoFile
+    from tqdm.auto import tqdm as base_tqdm
 
     # Get file list with real sizes upfront
     api = HfApi()
     files = [
-        f for f in api.list_repo_tree(repo_id=repo_id, repo_type="dataset", recursive=True)
-        if isinstance(f, RepoFile)
+        f for f in api.list_repo_tree(repo_id=repo_id, repo_type="dataset", recursive=True) if isinstance(f, RepoFile)
     ]
     num_files = len(files)
     total_size = sum(f.size or (f.lfs.size if f.lfs else 0) for f in files)
 
-    LOGGER.info(f"Downloading HuggingFace dataset {repo_id} "
-                f"({num_files} files, {total_size / 1e9:.1f} GB) ...")
+    LOGGER.info(f"Downloading HuggingFace dataset {repo_id} ({num_files} files, {total_size / 1e9:.1f} GB) ...")
 
     class _TqdmKnownTotal(base_tqdm):
-        """tqdm wrapper that injects pre-computed totals for HF progress bars."""
+        """Tqdm wrapper that injects pre-computed totals for HF progress bars."""
+
         _lock_total = False
 
         def __init__(self, *args, **kwargs):
@@ -247,16 +233,10 @@ def download_hf_dataset(repo_id: str, dest: Path, overwrite: bool = False) -> No
 
 
 def download_eval_data(
-    *,
-    runs_url: Optional[str] = None,
-    dataset_url: str,
-    dataset_dest: Path,
-    overwrite: bool = False
+    *, runs_url: str | None = None, dataset_url: str, dataset_dest: Path, overwrite: bool = False
 ) -> None:
-    """
-    Download & extract TrackEval evaluation data.
-    If `runs_url` is truthy, downloads+unzips runs.zip; otherwise skips it.
-    Always downloads+unzips the benchmark data.
+    """Download & extract TrackEval evaluation data. If `runs_url` is truthy, downloads+unzips runs.zip; otherwise skips
+    it. Always downloads+unzips the benchmark data.
     """
     LOGGER.info("Setting up evaluation data...")
 
@@ -270,8 +250,8 @@ def download_eval_data(
 
     # HuggingFace dataset (hf://owner/repo/subfolder)
     if dataset_url.startswith("hf://"):
-        parts = dataset_url[len("hf://"):].split("/")
-        repo_id = "/".join(parts[:2])        # e.g. "Fleyderer/FastTracker-Benchmark-MOT"
+        parts = dataset_url[len("hf://") :].split("/")
+        repo_id = "/".join(parts[:2])  # e.g. "Fleyderer/FastTracker-Benchmark-MOT"
         download_hf_dataset(repo_id, dataset_dest, overwrite=overwrite)
         return
 
@@ -289,15 +269,11 @@ if __name__ == "__main__":
     parser.add_argument("--verbose", action="store_true", help="Enable detailed logging.")
     args = parser.parse_args()
 
-    download_trackeval(
-        dest=Path("TrackEval"),
-        branch=args.branch,
-        overwrite=args.overwrite
-    )
+    download_trackeval(dest=Path("TrackEval"), branch=args.branch, overwrite=args.overwrite)
 
     download_eval_data(
         runs_url="https://github.com/mikel-brostrom/boxmot/releases/download/v16.0.11/runs.zip",
         dataset_url="https://github.com/mikel-brostrom/boxmot/releases/download/v10.0.83/MOT17-50.zip",
         dataset_dest=Path("boxmot/engine/TrackEval/MOT17-ablation.zip"),
-        overwrite=args.overwrite
+        overwrite=args.overwrite,
     )

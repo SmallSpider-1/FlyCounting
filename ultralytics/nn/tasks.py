@@ -35,7 +35,6 @@ from ultralytics.nn.modules import (
     C2fCIB,
     C2fPSA,
     C3Ghost,
-    C3k,
     C3k2,
     C3x,
     CBFuse,
@@ -78,28 +77,30 @@ from ultralytics.nn.modules import (
 # Optional YOLO11 improvement modules migrated for YOLO26 variants.
 try:
     import timm
-    from ultralytics.nn.extra_modules import *
+
     from ultralytics.nn.backbone.convnextv2 import *
-    from ultralytics.nn.backbone.fasternet import *
-    from ultralytics.nn.backbone.efficientViT import *
-    from ultralytics.nn.backbone.EfficientFormerV2 import *
-    from ultralytics.nn.backbone.VanillaNet import *
-    from ultralytics.nn.backbone.revcol import *
-    from ultralytics.nn.backbone.lsknet import *
-    from ultralytics.nn.backbone.SwinTransformer import *
-    from ultralytics.nn.backbone.repvit import *
     from ultralytics.nn.backbone.CSwomTramsformer import *
-    from ultralytics.nn.backbone.UniRepLKNet import *
-    from ultralytics.nn.backbone.TransNext import *
-    from ultralytics.nn.backbone.rmt import *
-    from ultralytics.nn.backbone.pkinet import *
-    from ultralytics.nn.backbone.mobilenetv4 import *
-    from ultralytics.nn.backbone.starnet import *
+    from ultralytics.nn.backbone.EfficientFormerV2 import *
+    from ultralytics.nn.backbone.efficientViT import *
+    from ultralytics.nn.backbone.fasternet import *
     from ultralytics.nn.backbone.inceptionnext import *
-    from ultralytics.nn.extra_modules.mobileMamba.mobilemamba import *
-    from ultralytics.nn.backbone.MambaOut import *
-    from ultralytics.nn.backbone.overlock import *
+    from ultralytics.nn.backbone.lsknet import *
     from ultralytics.nn.backbone.lsnet import *
+    from ultralytics.nn.backbone.MambaOut import *
+    from ultralytics.nn.backbone.mobilenetv4 import *
+    from ultralytics.nn.backbone.overlock import *
+    from ultralytics.nn.backbone.pkinet import *
+    from ultralytics.nn.backbone.repvit import *
+    from ultralytics.nn.backbone.revcol import *
+    from ultralytics.nn.backbone.rmt import *
+    from ultralytics.nn.backbone.starnet import *
+    from ultralytics.nn.backbone.SwinTransformer import *
+    from ultralytics.nn.backbone.TransNext import *
+    from ultralytics.nn.backbone.UniRepLKNet import *
+    from ultralytics.nn.backbone.VanillaNet import *
+    from ultralytics.nn.extra_modules import *
+    from ultralytics.nn.extra_modules.mobileMamba.mobilemamba import *
+
     CUSTOM_MODULE_IMPORT_ERROR = None
 except Exception as e:  # optional dependencies for some migrated modules may be unavailable.
     timm = None
@@ -130,31 +131,270 @@ from ultralytics.utils.torch_utils import (
     time_sync,
 )
 
-
 try:
-    DETECT_CLASS = (Detect, Detect_DyHead, Detect_AFPN_P2345, Detect_AFPN_P2345_Custom, Detect_AFPN_P345, Detect_AFPN_P345_Custom, Detect_Efficient, DetectAux, Detect_SEAM, Detect_MultiSEAM, 
-                    Detect_DyHeadWithDCNV3, Detect_DyHeadWithDCNV4, Detect_DyHead_Prune, Detect_LSCD, Detect_TADDH, Detect_LADH, Detect_LSCSBD, Detect_LSDECD, Detect_RSCD, Detect_FGIF, Detect_LQE,
-                    Detect_LSCD_LQE)
+    DETECT_CLASS = (
+        Detect,
+        Detect_DyHead,
+        Detect_AFPN_P2345,
+        Detect_AFPN_P2345_Custom,
+        Detect_AFPN_P345,
+        Detect_AFPN_P345_Custom,
+        Detect_Efficient,
+        DetectAux,
+        Detect_SEAM,
+        Detect_MultiSEAM,
+        Detect_DyHeadWithDCNV3,
+        Detect_DyHeadWithDCNV4,
+        Detect_DyHead_Prune,
+        Detect_LSCD,
+        Detect_TADDH,
+        Detect_LADH,
+        Detect_LSCSBD,
+        Detect_LSDECD,
+        Detect_RSCD,
+        Detect_FGIF,
+        Detect_LQE,
+        Detect_LSCD_LQE,
+    )
     V10_DETECT_CLASS = (v10Detect,)
-    SEGMENT_CLASS = (Segment, Segment_Efficient, Segment_LSCD, Segment_TADDH, Segment_LADH, Segment_LSCSBD, Segment_LSDECD, Segment_RSCD, Segment_LQE, Segment_LSCD_LQE)
+    SEGMENT_CLASS = (
+        Segment,
+        Segment_Efficient,
+        Segment_LSCD,
+        Segment_TADDH,
+        Segment_LADH,
+        Segment_LSCSBD,
+        Segment_LSDECD,
+        Segment_RSCD,
+        Segment_LQE,
+        Segment_LSCD_LQE,
+    )
     POSE_CLASS = (Pose, Pose_LSCD, Pose_TADDH, Pose_LADH, Pose_LSCSBD, Pose_LSDECD, Pose_RSCD, Pose_LQE, Pose_LSCD_LQE)
     OBB_CLASS = (OBB, OBB_LSCD, OBB_TADDH, OBB_LADH, OBB_LSCSBD, OBB_LSDECD, OBB_RSCD, OBB_LQE, OBB_LSCD_LQE)
-    C3K2_CLASS = (C3k2_Faster, C3k2_ODConv, C3k2_Faster_EMA, C3k2_DBB, C3k2_DeepDBB, C3k2_WDBB, C3k2_CloAtt, C3k2_SCConv, C3k2_ScConv, C3k2_EMSC, C3k2_EMSCP, C3k2_KW, C3k2_DySnakeConv, C3k2_DCNv2, C3k2_DCNv3,
-                  C3k2_OREPA, C3k2_REPVGGOREPA, C3k2_DCNv2_Dynamic, C3k2_ContextGuided, C3k2_MSBlock, C3k2_DLKA, C3k2_EMBC, C3k2_DAttention, C3k2_Parc, C3k2_DWR, C3k2_RFAConv, C3k2_RFCBAMConv, C3k2_RFCAConv,
-                  C3k2_FocusedLinearAttention, C3k2_MLCA, C3k2_AKConv, C3k2_UniRepLKNetBlock, C3k2_DRB, C3k2_DWR_DRB, C3k2_AggregatedAtt, C3k2_DCNv4, C3k2_SWC, C3k2_iRMB, C3k2_iRMB_Cascaded, C3k2_iRMB_DRB, C3k2_iRMB_SWC,
-                  C3k2_VSS, C3k2_LVMB, C3k2_DynamicConv, C3k2_GhostDynamicConv, C3k2_RVB, C3k2_RVB_SE, C3k2_RVB_EMA, C3k2_RetBlock, C3k2_PKIModule, C3k2_FADC, C3k2_PPA, C3k2_Faster_CGLU, C3k2_Star, C3k2_Star_CAA,
-                  C3k2_KAN, C3k2_EIEM, C3k2_DEConv, C3k2_SMPCGLU, C3k2_Heat, C3k2_WTConv, C3k2_FMB, C3k2_gConv, C3k2_AdditiveBlock, C3k2_AdditiveBlock_CGLU, C3k2_MSMHSA_CGLU, C3k2_MogaBlock, C3k2_SHSA, C3k2_SHSA_CGLU,
-                  C3k2_SMAFB, C3k2_SMAFB_CGLU, C3k2_IdentityFormer, C3k2_RandomMixing, C3k2_PoolingFormer, C3k2_ConvFormer, C3k2_CaFormer, C3k2_IdentityFormerCGLU, C3k2_RandomMixingCGLU, C3k2_PoolingFormerCGLU, C3k2_ConvFormerCGLU, C3k2_CaFormerCGLU,
-                  C3k2_FFCM, C3k2_MutilScaleEdgeInformationEnhance, C3k2_SFHF, C3k2_MSM, C3k2_MutilScaleEdgeInformationSelect, C3k2_HDRAB, C3k2_RAB, C3k2_LFE, C3k2_FCA_CTA, C3k2_FCA_SFA, C3k2_IDWC, C3k2_IDWB, C3k2_PConv, C3k2_EMA,
-                  C3k2_CAMixer, C3k2_HFERB, C3k2_DTAB, C3k2_JDPM, C3k2_ETB, C3k2_FDT, C3k2_AP, C3k2_ELGCA, C3k2_ELGCACGLU, C3k2_Strip, C3k2_StripCGLU, C3k2_Kat, C3k2_Faster_KAN, C3k2_DCMB, C3k2_DCMB_KAN, C3k2_GlobalFilter, C3k2_DynamicFilter,
-                  C3k2_TSSA, C3k2_SAVSS, C3k2_MobileMamba, C3k2_MambaOut, C3k2_MambaOut_UniRepLK, C3k2_EfficientVIM, C3k2_EfficientVIM_CGLU, C3k2_FAT, C3k2_LEGM, C3k2_RCB, C3k2_LFEM, C3k2_SBSM, C3k2_LSBlock, C3k2_MambaOut_LSConv, C3k2_TransMamba, C3k2_EVS,
-                  C3k2_EBlock, C3k2_DBlock, C3k2_FDConv, C3k2_MambaOut_FDConv, C3k2_PFDConv, C3k2_FasterFD, C3k2_DSAN, C3k2_MambaOut_DSA, C3k2_DSA, C3k2_DSAN_EDFFN, C3k2_RMB, C3k2_SFSConv, C3k2_MambaOut_SFSC, C3k2_PSFSConv, C3k2_FasterSFSC, C3k2_GroupMamba,
-                  C3k2_GroupMambaBlock, C3k2_MambaVision, DSC3k2, C3k2_wConv, C3k2_FourierConv, C3k2_GLVSS, C3k2_ESC, C3k2_MBRConv3, C3k2_MBRConv5, C3k2_VSSD, C3k2_TVIM, C3k2_CSI, C3k2_SHSA_EPGO, C3k2_SHSA_EPGO_CGLU, C3k2_ConvAttn, C3k2_UniConvBlock, C3k2_LGLB,
-                  C3k2_ConverseB, C3k2_Converse, C3k2_GCConv, C3k2_CFBlock, C3k2_FMABlock, C3k2_LWGA, C3k2_CSSC, C3k2_CNCM, C3k2_HFRB, C3k2_EVA, C3k2_RMBC, C3k2_RMBC_LA, C3k2_IEL, C3k2_SFMB
-                  )
-    A2C2F_CLASS = (A2C2f, A2C2f_CGLU, A2C2f_KAN, A2C2f_DFFN, A2C2f_FRFN, A2C2f_DYT, A2C2f_CGLU_DYT, A2C2f_DFFN_DYT, A2C2f_FMFFN, A2C2f_FMFFN_DYT, A2C2f_SEFN, A2C2f_Mona, A2C2f_DFFN_DYT_Mona, A2C2f_SEFFN, A2C2f_EDFFN)
-    C2PSA_CLASS = (C2PSA, C2BRA, C2CGA, C2DA, C2DPB, C2Pola, C2TSSA, C2ASSA, C2PSA_DYT, C2TSSA_DYT, C2Pola_DYT, C2PSA_FMFFN, C2PSA_CGLU, C2PSA_SEFN, C2PSA_Mona, C2PSA_SEFFN, C2TSSA_DYT_Mona, C2TSSA_DYT_Mona_SEFN, C2TSSA_DYT_Mona_SEFFN, C2PSA_EDFFN,
-                   C2TSSA_DYT_Mona_EDFFN, C2MSLA, C2PSA_EPGO, C2PSA_DML, C2PSA_LRSA, C2PSA_MALA, C2PSA_EGSA, C2PSA_SWSA)
+    C3K2_CLASS = (
+        C3k2_Faster,
+        C3k2_ODConv,
+        C3k2_Faster_EMA,
+        C3k2_DBB,
+        C3k2_DeepDBB,
+        C3k2_WDBB,
+        C3k2_CloAtt,
+        C3k2_SCConv,
+        C3k2_ScConv,
+        C3k2_EMSC,
+        C3k2_EMSCP,
+        C3k2_KW,
+        C3k2_DySnakeConv,
+        C3k2_DCNv2,
+        C3k2_DCNv3,
+        C3k2_OREPA,
+        C3k2_REPVGGOREPA,
+        C3k2_DCNv2_Dynamic,
+        C3k2_ContextGuided,
+        C3k2_MSBlock,
+        C3k2_DLKA,
+        C3k2_EMBC,
+        C3k2_DAttention,
+        C3k2_Parc,
+        C3k2_DWR,
+        C3k2_RFAConv,
+        C3k2_RFCBAMConv,
+        C3k2_RFCAConv,
+        C3k2_FocusedLinearAttention,
+        C3k2_MLCA,
+        C3k2_AKConv,
+        C3k2_UniRepLKNetBlock,
+        C3k2_DRB,
+        C3k2_DWR_DRB,
+        C3k2_AggregatedAtt,
+        C3k2_DCNv4,
+        C3k2_SWC,
+        C3k2_iRMB,
+        C3k2_iRMB_Cascaded,
+        C3k2_iRMB_DRB,
+        C3k2_iRMB_SWC,
+        C3k2_VSS,
+        C3k2_LVMB,
+        C3k2_DynamicConv,
+        C3k2_GhostDynamicConv,
+        C3k2_RVB,
+        C3k2_RVB_SE,
+        C3k2_RVB_EMA,
+        C3k2_RetBlock,
+        C3k2_PKIModule,
+        C3k2_FADC,
+        C3k2_PPA,
+        C3k2_Faster_CGLU,
+        C3k2_Star,
+        C3k2_Star_CAA,
+        C3k2_KAN,
+        C3k2_EIEM,
+        C3k2_DEConv,
+        C3k2_SMPCGLU,
+        C3k2_Heat,
+        C3k2_WTConv,
+        C3k2_FMB,
+        C3k2_gConv,
+        C3k2_AdditiveBlock,
+        C3k2_AdditiveBlock_CGLU,
+        C3k2_MSMHSA_CGLU,
+        C3k2_MogaBlock,
+        C3k2_SHSA,
+        C3k2_SHSA_CGLU,
+        C3k2_SMAFB,
+        C3k2_SMAFB_CGLU,
+        C3k2_IdentityFormer,
+        C3k2_RandomMixing,
+        C3k2_PoolingFormer,
+        C3k2_ConvFormer,
+        C3k2_CaFormer,
+        C3k2_IdentityFormerCGLU,
+        C3k2_RandomMixingCGLU,
+        C3k2_PoolingFormerCGLU,
+        C3k2_ConvFormerCGLU,
+        C3k2_CaFormerCGLU,
+        C3k2_FFCM,
+        C3k2_MutilScaleEdgeInformationEnhance,
+        C3k2_SFHF,
+        C3k2_MSM,
+        C3k2_MutilScaleEdgeInformationSelect,
+        C3k2_HDRAB,
+        C3k2_RAB,
+        C3k2_LFE,
+        C3k2_FCA_CTA,
+        C3k2_FCA_SFA,
+        C3k2_IDWC,
+        C3k2_IDWB,
+        C3k2_PConv,
+        C3k2_EMA,
+        C3k2_CAMixer,
+        C3k2_HFERB,
+        C3k2_DTAB,
+        C3k2_JDPM,
+        C3k2_ETB,
+        C3k2_FDT,
+        C3k2_AP,
+        C3k2_ELGCA,
+        C3k2_ELGCACGLU,
+        C3k2_Strip,
+        C3k2_StripCGLU,
+        C3k2_Kat,
+        C3k2_Faster_KAN,
+        C3k2_DCMB,
+        C3k2_DCMB_KAN,
+        C3k2_GlobalFilter,
+        C3k2_DynamicFilter,
+        C3k2_TSSA,
+        C3k2_SAVSS,
+        C3k2_MobileMamba,
+        C3k2_MambaOut,
+        C3k2_MambaOut_UniRepLK,
+        C3k2_EfficientVIM,
+        C3k2_EfficientVIM_CGLU,
+        C3k2_FAT,
+        C3k2_LEGM,
+        C3k2_RCB,
+        C3k2_LFEM,
+        C3k2_SBSM,
+        C3k2_LSBlock,
+        C3k2_MambaOut_LSConv,
+        C3k2_TransMamba,
+        C3k2_EVS,
+        C3k2_EBlock,
+        C3k2_DBlock,
+        C3k2_FDConv,
+        C3k2_MambaOut_FDConv,
+        C3k2_PFDConv,
+        C3k2_FasterFD,
+        C3k2_DSAN,
+        C3k2_MambaOut_DSA,
+        C3k2_DSA,
+        C3k2_DSAN_EDFFN,
+        C3k2_RMB,
+        C3k2_SFSConv,
+        C3k2_MambaOut_SFSC,
+        C3k2_PSFSConv,
+        C3k2_FasterSFSC,
+        C3k2_GroupMamba,
+        C3k2_GroupMambaBlock,
+        C3k2_MambaVision,
+        DSC3k2,
+        C3k2_wConv,
+        C3k2_FourierConv,
+        C3k2_GLVSS,
+        C3k2_ESC,
+        C3k2_MBRConv3,
+        C3k2_MBRConv5,
+        C3k2_VSSD,
+        C3k2_TVIM,
+        C3k2_CSI,
+        C3k2_SHSA_EPGO,
+        C3k2_SHSA_EPGO_CGLU,
+        C3k2_ConvAttn,
+        C3k2_UniConvBlock,
+        C3k2_LGLB,
+        C3k2_ConverseB,
+        C3k2_Converse,
+        C3k2_GCConv,
+        C3k2_CFBlock,
+        C3k2_FMABlock,
+        C3k2_LWGA,
+        C3k2_CSSC,
+        C3k2_CNCM,
+        C3k2_HFRB,
+        C3k2_EVA,
+        C3k2_RMBC,
+        C3k2_RMBC_LA,
+        C3k2_IEL,
+        C3k2_SFMB,
+    )
+    A2C2F_CLASS = (
+        A2C2f,
+        A2C2f_CGLU,
+        A2C2f_KAN,
+        A2C2f_DFFN,
+        A2C2f_FRFN,
+        A2C2f_DYT,
+        A2C2f_CGLU_DYT,
+        A2C2f_DFFN_DYT,
+        A2C2f_FMFFN,
+        A2C2f_FMFFN_DYT,
+        A2C2f_SEFN,
+        A2C2f_Mona,
+        A2C2f_DFFN_DYT_Mona,
+        A2C2f_SEFFN,
+        A2C2f_EDFFN,
+    )
+    C2PSA_CLASS = (
+        C2PSA,
+        C2BRA,
+        C2CGA,
+        C2DA,
+        C2DPB,
+        C2Pola,
+        C2TSSA,
+        C2ASSA,
+        C2PSA_DYT,
+        C2TSSA_DYT,
+        C2Pola_DYT,
+        C2PSA_FMFFN,
+        C2PSA_CGLU,
+        C2PSA_SEFN,
+        C2PSA_Mona,
+        C2PSA_SEFFN,
+        C2TSSA_DYT_Mona,
+        C2TSSA_DYT_Mona_SEFN,
+        C2TSSA_DYT_Mona_SEFFN,
+        C2PSA_EDFFN,
+        C2TSSA_DYT_Mona_EDFFN,
+        C2MSLA,
+        C2PSA_EPGO,
+        C2PSA_DML,
+        C2PSA_LRSA,
+        C2PSA_MALA,
+        C2PSA_EGSA,
+        C2PSA_SWSA,
+    )
 except NameError:
     DETECT_CLASS = (Detect,)
     V10_DETECT_CLASS = (v10Detect,)
@@ -1966,7 +2206,7 @@ def parse_model(d, ch, verbose=True, warehouse_manager=None):  # model_dict, inp
     if scales:
         scale = d.get("scale")
         if not scale:
-            scale = tuple(scales.keys())[0]
+            scale = next(iter(scales.keys()))
             LOGGER.warning(f"WARNING ⚠️ no model scale passed. Assuming scale='{scale}'.")
         if len(scales[scale]) == 3:
             depth, width, max_channels = scales[scale]
@@ -1985,10 +2225,10 @@ def parse_model(d, ch, verbose=True, warehouse_manager=None):  # model_dict, inp
     is_backbone = False
     for i, (f, n, m, args) in enumerate(d["backbone"] + d["head"]):  # from, number, module, args
         try:
-            if m == 'node_mode':
+            if m == "node_mode":
                 m = d[m]
                 if len(args) > 0:
-                    if args[0] == 'head_channel':
+                    if args[0] == "head_channel":
                         args[0] = int(d[args[0]])
             t = m
             m = (
@@ -2019,17 +2259,102 @@ def parse_model(d, ch, verbose=True, warehouse_manager=None):  # model_dict, inp
                         args[j] = a
 
         n = n_ = max(round(n * depth), 1) if n > 1 else n  # depth gain
-        if m in ((
-            Classify, Conv, ConvTranspose, GhostConv, Bottleneck, GhostBottleneck, SPP, SPPF, C2fPSA, DWConv, Focus, BottleneckCSP,
-            C1, C2, C2f, C3k2, RepNCSPELAN4, ELAN1, ADown, AConv, SPPELAN, C2fAttn, C3, C3TR, C3Ghost, nn.ConvTranspose2d, DWConvTranspose2d,
-            C3x, RepC3, PSA, SCDown, C2fCIB, GSConv, GSConvns, VoVGSCSP, VoVGSCSPns, VoVGSCSPC, RCSOSA, KWConv, CSPStage, SPDConv, RepBlock,
-            SPPF_LSKA, CSP_EDLAN, nn.Conv2d, HWD, RepNCSPELAN4, DBBNCSPELAN4, OREPANCSPELAN4, DRBNCSPELAN4, RepNCSPELAN4_CAA, V7DownSampling,
-            DGCST, RepNCSPELAN4_CAA, SRFD, DRFD, RGCSPELAN, CSP_PTB, SimpleStem, VisionClueMerge, VSSBlock_YOLO, XSSBlock, GLSA, FeaturePyramidSharedConv,
-            LDConv, CSP_MSCB, CSP_PMSFA, RFAConv, RFCBAMConv, RFCAConv, CSP_FreqSpatial, MANet, MANet_FasterBlock, MANet_FasterCGLU, 
-            MANet_Star, PSConv, RepHMS, CSP_MSCB_SC, LoGStem, GSConvE, DSConv_YOLO13, wConv2d, FourierConv, Converse2D, GCConv, MANet_GCConv,
-            RepStem, ESMoE
-        ) + C3K2_CLASS + A2C2F_CLASS + C2PSA_CLASS):
-            if args[0] == 'head_channel':
+        if m in (
+            (
+                Classify,
+                Conv,
+                ConvTranspose,
+                GhostConv,
+                Bottleneck,
+                GhostBottleneck,
+                SPP,
+                SPPF,
+                C2fPSA,
+                DWConv,
+                Focus,
+                BottleneckCSP,
+                C1,
+                C2,
+                C2f,
+                C3k2,
+                RepNCSPELAN4,
+                ELAN1,
+                ADown,
+                AConv,
+                SPPELAN,
+                C2fAttn,
+                C3,
+                C3TR,
+                C3Ghost,
+                nn.ConvTranspose2d,
+                DWConvTranspose2d,
+                C3x,
+                RepC3,
+                PSA,
+                SCDown,
+                C2fCIB,
+                GSConv,
+                GSConvns,
+                VoVGSCSP,
+                VoVGSCSPns,
+                VoVGSCSPC,
+                RCSOSA,
+                KWConv,
+                CSPStage,
+                SPDConv,
+                RepBlock,
+                SPPF_LSKA,
+                CSP_EDLAN,
+                nn.Conv2d,
+                HWD,
+                RepNCSPELAN4,
+                DBBNCSPELAN4,
+                OREPANCSPELAN4,
+                DRBNCSPELAN4,
+                RepNCSPELAN4_CAA,
+                V7DownSampling,
+                DGCST,
+                RepNCSPELAN4_CAA,
+                SRFD,
+                DRFD,
+                RGCSPELAN,
+                CSP_PTB,
+                SimpleStem,
+                VisionClueMerge,
+                VSSBlock_YOLO,
+                XSSBlock,
+                GLSA,
+                FeaturePyramidSharedConv,
+                LDConv,
+                CSP_MSCB,
+                CSP_PMSFA,
+                RFAConv,
+                RFCBAMConv,
+                RFCAConv,
+                CSP_FreqSpatial,
+                MANet,
+                MANet_FasterBlock,
+                MANet_FasterCGLU,
+                MANet_Star,
+                PSConv,
+                RepHMS,
+                CSP_MSCB_SC,
+                LoGStem,
+                GSConvE,
+                DSConv_YOLO13,
+                wConv2d,
+                FourierConv,
+                Converse2D,
+                GCConv,
+                MANet_GCConv,
+                RepStem,
+                ESMoE,
+                *C3K2_CLASS,
+                *A2C2F_CLASS,
+                *C2PSA_CLASS,
+            )
+        ):
+            if args[0] == "head_channel":
                 args[0] = d[args[0]]
             c1, c2 = ch[f], args[0]
             if c2 != nc:  # if c2 not equal to number of classes (i.e. for Classify() output)
@@ -2042,31 +2367,83 @@ def parse_model(d, ch, verbose=True, warehouse_manager=None):  # model_dict, inp
 
             args = [c1, c2, *args[1:]]
             if m in (KWConv, C3k2_KW):
-                args.insert(2, f'layer{i}')
+                args.insert(2, f"layer{i}")
                 args.insert(2, warehouse_manager)
             if m in (DySnakeConv,):
                 c2 = c2 * 3
             if m in (RepNCSPELAN4, DBBNCSPELAN4, OREPANCSPELAN4, DRBNCSPELAN4, RepNCSPELAN4_CAA):
                 args[2] = make_divisible(min(args[2], max_channels) * width, 8)
                 args[3] = make_divisible(min(args[3], max_channels) * width, 8)
-            if m in ((
-                BottleneckCSP, C1, C2, C2f, C3k2, C2fAttn, C3, C3TR, C3Ghost, C3x, RepC3, C2fPSA, C2fCIB, VoVGSCSP, VoVGSCSPns, VoVGSCSPC, RCSOSA,
-                CSPStage, SPDConv, RepBlock, CSP_EDLAN, RGCSPELAN, CSP_PTB, XSSBlock, CSP_MSCB, CSP_PMSFA, CSP_FreqSpatial, MANet,
-                MANet_FasterBlock, MANet_FasterCGLU, MANet_Star, CSP_MSCB_SC, MANet_GCConv
-            ) + C3K2_CLASS + A2C2F_CLASS + C2PSA_CLASS):
+            if m in (
+                (
+                    BottleneckCSP,
+                    C1,
+                    C2,
+                    C2f,
+                    C3k2,
+                    C2fAttn,
+                    C3,
+                    C3TR,
+                    C3Ghost,
+                    C3x,
+                    RepC3,
+                    C2fPSA,
+                    C2fCIB,
+                    VoVGSCSP,
+                    VoVGSCSPns,
+                    VoVGSCSPC,
+                    RCSOSA,
+                    CSPStage,
+                    SPDConv,
+                    RepBlock,
+                    CSP_EDLAN,
+                    RGCSPELAN,
+                    CSP_PTB,
+                    XSSBlock,
+                    CSP_MSCB,
+                    CSP_PMSFA,
+                    CSP_FreqSpatial,
+                    MANet,
+                    MANet_FasterBlock,
+                    MANet_FasterCGLU,
+                    MANet_Star,
+                    CSP_MSCB_SC,
+                    MANet_GCConv,
+                    *C3K2_CLASS,
+                    *A2C2F_CLASS,
+                    *C2PSA_CLASS,
+                )
+            ):
                 args.insert(2, n)  # number of repeats
                 n = 1
-            if m in ((C3k2,) + C3K2_CLASS) and scale in "mlx":  # for M/L/X sizes
-                if m in (C3k2_AggregatedAtt, C3k2_MSBlock, C3k2_DAttention, C3k2_FocusedLinearAttention, C3k2_Parc, C3k2_UniRepLKNetBlock, C3k2_SMPCGLU, 
-                         C3k2_Heat, C3k2_RandomMixing, C3k2_RandomMixingCGLU, C3k2_PKIModule, C3k2_FCA_CTA, C3k2_GlobalFilter, C3k2_DynamicFilter, C3k2_RMB,
-                         C3k2_wConv, C3k2_FourierConv, C3k2_LWGA):
+            if m in ((C3k2, *C3K2_CLASS)) and scale in "mlx":  # for M/L/X sizes
+                if m in (
+                    C3k2_AggregatedAtt,
+                    C3k2_MSBlock,
+                    C3k2_DAttention,
+                    C3k2_FocusedLinearAttention,
+                    C3k2_Parc,
+                    C3k2_UniRepLKNetBlock,
+                    C3k2_SMPCGLU,
+                    C3k2_Heat,
+                    C3k2_RandomMixing,
+                    C3k2_RandomMixingCGLU,
+                    C3k2_PKIModule,
+                    C3k2_FCA_CTA,
+                    C3k2_GlobalFilter,
+                    C3k2_DynamicFilter,
+                    C3k2_RMB,
+                    C3k2_wConv,
+                    C3k2_FourierConv,
+                    C3k2_LWGA,
+                ):
                     if type(args[-1]) == bool:
                         args[-1] = True
                     else:
                         args[-2] = True
                 else:
                     args[3] = True
-            if m in A2C2F_CLASS and scale in "lx": # for L/X sizes
+            if m in A2C2F_CLASS and scale in "lx":  # for L/X sizes
                 args.extend((True, 1.2))
         elif m in {AIFI, AIFI_RepBN, DTAB, ETB, FDT}:
             args = [ch[f], *args]
@@ -2086,12 +2463,30 @@ def parse_model(d, ch, verbose=True, warehouse_manager=None):  # model_dict, inp
             args = [ch[f]]
         elif m is Concat:
             c2 = sum(ch[x] for x in f)
-        elif m in {Detect, WorldDetect, YOLOEDetect, Segment, Segment26, YOLOESegment, YOLOESegment26, Pose, Pose26, OBB, OBB26}:
+        elif m in {
+            Detect,
+            WorldDetect,
+            YOLOEDetect,
+            Segment,
+            Segment26,
+            YOLOESegment,
+            YOLOESegment26,
+            Pose,
+            Pose26,
+            OBB,
+            OBB26,
+        }:
             args.extend([reg_max, end2end, [ch[x] for x in f]])
             if m in {Segment, YOLOESegment, Segment26, YOLOESegment26}:
                 args[2] = make_divisible(min(args[2], max_channels) * width, 8)
             m.legacy = legacy
-        elif m in (tuple(x for x in DETECT_CLASS if x is not Detect) + V10_DETECT_CLASS + tuple(x for x in SEGMENT_CLASS if x is not Segment) + tuple(x for x in POSE_CLASS if x is not Pose) + tuple(x for x in OBB_CLASS if x is not OBB)):
+        elif m in (
+            tuple(x for x in DETECT_CLASS if x is not Detect)
+            + V10_DETECT_CLASS
+            + tuple(x for x in SEGMENT_CLASS if x is not Segment)
+            + tuple(x for x in POSE_CLASS if x is not Pose)
+            + tuple(x for x in OBB_CLASS if x is not OBB)
+        ):
             args.append([ch[x] for x in f])
             if m in SEGMENT_CLASS:
                 args[2] = make_divisible(min(args[2], max_channels) * width, 8)
@@ -2099,14 +2494,26 @@ def parse_model(d, ch, verbose=True, warehouse_manager=None):  # model_dict, inp
                     args[3] = make_divisible(min(args[3], max_channels) * width, 8)
             if m in (Detect_LSCD, Detect_TADDH, Detect_LSCSBD, Detect_LSDECD, Detect_RSCD, Detect_LSCD_LQE):
                 args[1] = make_divisible(min(args[1], max_channels) * width, 8)
-            if m in (Pose_LSCD, Pose_TADDH, Pose_LSCSBD, Pose_LSDECD, Pose_RSCD, Pose_LSCD_LQE, 
-                     OBB_LSCD, OBB_TADDH, OBB_LSCSBD, OBB_LSDECD, OBB_RSCD, OBB_LSCD_LQE):
+            if m in (
+                Pose_LSCD,
+                Pose_TADDH,
+                Pose_LSCSBD,
+                Pose_LSDECD,
+                Pose_RSCD,
+                Pose_LSCD_LQE,
+                OBB_LSCD,
+                OBB_TADDH,
+                OBB_LSCSBD,
+                OBB_LSDECD,
+                OBB_RSCD,
+                OBB_LSCD_LQE,
+            ):
                 args[2] = make_divisible(min(args[2], max_channels) * width, 8)
         elif m is RTDETRDecoder:  # special case, channels arg must be passed in index 1
             args.insert(1, [ch[x] for x in f])
         elif m is Fusion:
             args[0] = d[args[0]]
-            c1, c2 = [ch[x] for x in f], (sum([ch[x] for x in f]) if args[0] == 'concat' else ch[f[0]])
+            c1, c2 = [ch[x] for x in f], (sum([ch[x] for x in f]) if args[0] == "concat" else ch[f[0]])
             args = [c1, args[0]]
         elif m in {TorchVision, Index}:
             c2 = args[0]
@@ -2120,45 +2527,168 @@ def parse_model(d, ch, verbose=True, warehouse_manager=None):  # model_dict, inp
             c2 = ch[f[-1]]
         elif isinstance(m, str):
             t = m
-            if len(args) == 2:        
-                m = timm.create_model(m, pretrained=args[0], pretrained_cfg_overlay={'file':args[1]}, features_only=True)
+            if len(args) == 2:
+                m = timm.create_model(
+                    m, pretrained=args[0], pretrained_cfg_overlay={"file": args[1]}, features_only=True
+                )
             elif len(args) == 1:
                 m = timm.create_model(m, pretrained=args[0], features_only=True)
             c2 = m.feature_info.channels()
-        elif m in {convnextv2_atto, convnextv2_femto, convnextv2_pico, convnextv2_nano, convnextv2_tiny, convnextv2_base, convnextv2_large, convnextv2_huge,
-                   fasternet_t0, fasternet_t1, fasternet_t2, fasternet_s, fasternet_m, fasternet_l,
-                   EfficientViT_M0, EfficientViT_M1, EfficientViT_M2, EfficientViT_M3, EfficientViT_M4, EfficientViT_M5,
-                   efficientformerv2_s0, efficientformerv2_s1, efficientformerv2_s2, efficientformerv2_l,
-                   vanillanet_5, vanillanet_6, vanillanet_7, vanillanet_8, vanillanet_9, vanillanet_10, vanillanet_11, vanillanet_12, vanillanet_13, vanillanet_13_x1_5, vanillanet_13_x1_5_ada_pool,
-                   RevCol,
-                   lsknet_t, lsknet_s,
-                   SwinTransformer_Tiny,
-                   repvit_m0_9, repvit_m1_0, repvit_m1_1, repvit_m1_5, repvit_m2_3,
-                   CSWin_tiny, CSWin_small, CSWin_base, CSWin_large,
-                   unireplknet_a, unireplknet_f, unireplknet_p, unireplknet_n, unireplknet_t, unireplknet_s, unireplknet_b, unireplknet_l, unireplknet_xl,
-                   transnext_micro, transnext_tiny, transnext_small, transnext_base,
-                   RMT_T, RMT_S, RMT_B, RMT_L,
-                   PKINET_T, PKINET_S, PKINET_B,
-                   MobileNetV4ConvSmall, MobileNetV4ConvMedium, MobileNetV4ConvLarge, MobileNetV4HybridMedium, MobileNetV4HybridLarge,
-                   starnet_s050, starnet_s100, starnet_s150, starnet_s1, starnet_s2, starnet_s3, starnet_s4,
-                   inceptionnext_tiny, inceptionnext_small, inceptionnext_base, inceptionnext_base_384,
-                   MobileMamba_T2, MobileMamba_T4, MobileMamba_S6, MobileMamba_B1, MobileMamba_B2, MobileMamba_B4,
-                   mambaout_femto, mambaout_kobe, mambaout_tiny, mambaout_small, mambaout_base,
-                   overlock_xt, overlock_t, overlock_s, overlock_b,
-                   lsnet_t, lsnet_s, lsnet_b
-                   }:
+        elif m in {
+            convnextv2_atto,
+            convnextv2_femto,
+            convnextv2_pico,
+            convnextv2_nano,
+            convnextv2_tiny,
+            convnextv2_base,
+            convnextv2_large,
+            convnextv2_huge,
+            fasternet_t0,
+            fasternet_t1,
+            fasternet_t2,
+            fasternet_s,
+            fasternet_m,
+            fasternet_l,
+            EfficientViT_M0,
+            EfficientViT_M1,
+            EfficientViT_M2,
+            EfficientViT_M3,
+            EfficientViT_M4,
+            EfficientViT_M5,
+            efficientformerv2_s0,
+            efficientformerv2_s1,
+            efficientformerv2_s2,
+            efficientformerv2_l,
+            vanillanet_5,
+            vanillanet_6,
+            vanillanet_7,
+            vanillanet_8,
+            vanillanet_9,
+            vanillanet_10,
+            vanillanet_11,
+            vanillanet_12,
+            vanillanet_13,
+            vanillanet_13_x1_5,
+            vanillanet_13_x1_5_ada_pool,
+            RevCol,
+            lsknet_t,
+            lsknet_s,
+            SwinTransformer_Tiny,
+            repvit_m0_9,
+            repvit_m1_0,
+            repvit_m1_1,
+            repvit_m1_5,
+            repvit_m2_3,
+            CSWin_tiny,
+            CSWin_small,
+            CSWin_base,
+            CSWin_large,
+            unireplknet_a,
+            unireplknet_f,
+            unireplknet_p,
+            unireplknet_n,
+            unireplknet_t,
+            unireplknet_s,
+            unireplknet_b,
+            unireplknet_l,
+            unireplknet_xl,
+            transnext_micro,
+            transnext_tiny,
+            transnext_small,
+            transnext_base,
+            RMT_T,
+            RMT_S,
+            RMT_B,
+            RMT_L,
+            PKINET_T,
+            PKINET_S,
+            PKINET_B,
+            MobileNetV4ConvSmall,
+            MobileNetV4ConvMedium,
+            MobileNetV4ConvLarge,
+            MobileNetV4HybridMedium,
+            MobileNetV4HybridLarge,
+            starnet_s050,
+            starnet_s100,
+            starnet_s150,
+            starnet_s1,
+            starnet_s2,
+            starnet_s3,
+            starnet_s4,
+            inceptionnext_tiny,
+            inceptionnext_small,
+            inceptionnext_base,
+            inceptionnext_base_384,
+            MobileMamba_T2,
+            MobileMamba_T4,
+            MobileMamba_S6,
+            MobileMamba_B1,
+            MobileMamba_B2,
+            MobileMamba_B4,
+            mambaout_femto,
+            mambaout_kobe,
+            mambaout_tiny,
+            mambaout_small,
+            mambaout_base,
+            overlock_xt,
+            overlock_t,
+            overlock_s,
+            overlock_b,
+            lsnet_t,
+            lsnet_s,
+            lsnet_b,
+        }:
             if m is RevCol:
                 args[1] = [make_divisible(min(k, max_channels) * width, 8) for k in args[1]]
                 args[2] = [max(round(k * depth), 1) for k in args[2]]
             m = m(*args)
             c2 = m.channel
-        elif m in {EMA, SpatialAttention, BiLevelRoutingAttention, BiLevelRoutingAttention_nchw,
-                   TripletAttention, CoordAtt, CBAM, BAMBlock, LSKBlock, ScConv, LAWDS, EMSConv, EMSConvP,
-                   SEAttention, CPCA, Partial_conv3, FocalModulation, EfficientAttention, MPCA, deformable_LKA,
-                   EffectiveSEModule, LSKA, SegNext_Attention, DAttention, MLCA, TransNeXt_AggregatedAttention,
-                   FocusedLinearAttention, LocalWindowAttention, ChannelAttention_HSFPN, ELA_HSFPN, CA_HSFPN, CAA_HSFPN, 
-                   DySample, CARAFE, CAA, ELA, CAFM, AFGCAttention, EUCB, EfficientChannelAttention, ContrastDrivenFeatureAggregation, 
-                   FSA, AttentiveLayer, EUCB_SC}:
+        elif m in {
+            EMA,
+            SpatialAttention,
+            BiLevelRoutingAttention,
+            BiLevelRoutingAttention_nchw,
+            TripletAttention,
+            CoordAtt,
+            CBAM,
+            BAMBlock,
+            LSKBlock,
+            ScConv,
+            LAWDS,
+            EMSConv,
+            EMSConvP,
+            SEAttention,
+            CPCA,
+            Partial_conv3,
+            FocalModulation,
+            EfficientAttention,
+            MPCA,
+            deformable_LKA,
+            EffectiveSEModule,
+            LSKA,
+            SegNext_Attention,
+            DAttention,
+            MLCA,
+            TransNeXt_AggregatedAttention,
+            FocusedLinearAttention,
+            LocalWindowAttention,
+            ChannelAttention_HSFPN,
+            ELA_HSFPN,
+            CA_HSFPN,
+            CAA_HSFPN,
+            DySample,
+            CARAFE,
+            CAA,
+            ELA,
+            CAFM,
+            AFGCAttention,
+            EUCB,
+            EfficientChannelAttention,
+            ContrastDrivenFeatureAggregation,
+            FSA,
+            AttentiveLayer,
+            EUCB_SC,
+        }:
             c2 = ch[f]
             args = [c2, *args]
             # print(args)
@@ -2292,7 +2822,7 @@ def parse_model(d, ch, verbose=True, warehouse_manager=None):  # model_dict, inp
             c2 = c1[0]
             args = [c1]
         elif m in {HAFB, MFM}:
-            if args[0] == 'head_channel':
+            if args[0] == "head_channel":
                 args[0] = d[args[0]]
             c1 = [ch[x] for x in f]
             c2 = make_divisible(min(args[0], max_channels) * width, 8)
@@ -2313,7 +2843,7 @@ def parse_model(d, ch, verbose=True, warehouse_manager=None):  # model_dict, inp
             c1 = ch[f[1]]
             c2 = args[0]
             c2 = make_divisible(min(c2, max_channels) * width, 8)
-            he = args[1] 
+            he = args[1]
             if scale in "n":
                 he = int(args[1] * 0.5)
             elif scale in "x":
@@ -2328,7 +2858,7 @@ def parse_model(d, ch, verbose=True, warehouse_manager=None):  # model_dict, inp
             args = [c1]
             if scale in "lx":  # for L/X sizes
                 args.append(False)
-                c2 =c1
+                c2 = c1
         elif m is FullPAD_Tunnel:
             c2 = ch[f[0]]
         elif m is PST:
@@ -2357,22 +2887,36 @@ def parse_model(d, ch, verbose=True, warehouse_manager=None):  # model_dict, inp
         else:
             c2 = ch[f]
 
-        if isinstance(c2, list) and m not in {ChannelTransformer, PyramidContextExtraction, CrossLayerChannelAttention, CrossLayerSpatialAttention, MutilScaleEdgeInfoGenetator}:
+        if isinstance(c2, list) and m not in {
+            ChannelTransformer,
+            PyramidContextExtraction,
+            CrossLayerChannelAttention,
+            CrossLayerSpatialAttention,
+            MutilScaleEdgeInfoGenetator,
+        }:
             is_backbone = True
             m_ = m
             m_.backbone = True
         else:
             m_ = nn.Sequential(*(m(*args) for _ in range(n))) if n > 1 else m(*args)  # module
-            t = str(m)[8:-2].replace('__main__.', '')  # module type
+            t = str(m)[8:-2].replace("__main__.", "")  # module type
         m_.np = sum(x.numel() for x in m_.parameters())  # number params
         m_.i, m_.f, m_.type = i + 4 if is_backbone else i, f, t  # attach index, 'from' index, type
         if verbose:
-            LOGGER.info(f"{i:>3}{str(f):>20}{n_:>3}{m_.np:10.0f}  {t:<45}{str(args):<30}")  # print
-        save.extend(x % (i + 4 if is_backbone else i) for x in ([f] if isinstance(f, int) else f) if x != -1)  # append to savelist
+            LOGGER.info(f"{i:>3}{f!s:>20}{n_:>3}{m_.np:10.0f}  {t:<45}{args!s:<30}")  # print
+        save.extend(
+            x % (i + 4 if is_backbone else i) for x in ([f] if isinstance(f, int) else f) if x != -1
+        )  # append to savelist
         layers.append(m_)
         if i == 0:
             ch = []
-        if isinstance(c2, list) and m not in {ChannelTransformer, PyramidContextExtraction, CrossLayerChannelAttention, CrossLayerSpatialAttention, MutilScaleEdgeInfoGenetator}:
+        if isinstance(c2, list) and m not in {
+            ChannelTransformer,
+            PyramidContextExtraction,
+            CrossLayerChannelAttention,
+            CrossLayerSpatialAttention,
+            MutilScaleEdgeInfoGenetator,
+        }:
             ch.extend(c2)
             for _ in range(5 - len(ch)):
                 ch.insert(0, 0)

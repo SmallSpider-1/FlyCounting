@@ -1,22 +1,21 @@
 # Copyright (c) 2023, Albert Gu, Tri Dao.
 
-import math
-from functools import partial
-import json
-import os
 import copy
-
+import json
+import math
+import os
 from collections import namedtuple
+from functools import partial
 
 import torch
 import torch.nn as nn
 
 from mamba_ssm.models.config_mamba import MambaConfig
-from mamba_ssm.modules.mamba_simple import Mamba
+from mamba_ssm.modules.block import Block
 from mamba_ssm.modules.mamba2 import Mamba2
+from mamba_ssm.modules.mamba_simple import Mamba
 from mamba_ssm.modules.mha import MHA
 from mamba_ssm.modules.mlp import GatedMLP
-from mamba_ssm.modules.block import Block
 from mamba_ssm.utils.generation import GenerationMixin
 from mamba_ssm.utils.hf import load_config_hf, load_state_dict_hf
 
@@ -54,22 +53,15 @@ def create_block(
         if ssm_layer not in ["Mamba1", "Mamba2"]:
             raise ValueError(f"Invalid ssm_layer: {ssm_layer}, only support Mamba1 and Mamba2")
         mixer_cls = partial(
-            Mamba2 if ssm_layer == "Mamba2" else Mamba,
-            layer_idx=layer_idx,
-            **ssm_cfg,
-            **factory_kwargs
+            Mamba2 if ssm_layer == "Mamba2" else Mamba, layer_idx=layer_idx, **ssm_cfg, **factory_kwargs
         )
     else:
         mixer_cls = partial(MHA, layer_idx=layer_idx, **attn_cfg, **factory_kwargs)
-    norm_cls = partial(
-        nn.LayerNorm if not rms_norm else RMSNorm, eps=norm_epsilon, **factory_kwargs
-    )
+    norm_cls = partial(nn.LayerNorm if not rms_norm else RMSNorm, eps=norm_epsilon, **factory_kwargs)
     if d_intermediate == 0:
         mlp_cls = nn.Identity
     else:
-        mlp_cls = partial(
-            GatedMLP, hidden_features=d_intermediate, out_features=d_model, **factory_kwargs
-        )
+        mlp_cls = partial(GatedMLP, hidden_features=d_intermediate, out_features=d_model, **factory_kwargs)
     block = Block(
         d_model,
         mixer_cls,
@@ -168,9 +160,7 @@ class MixerModel(nn.Module):
             ]
         )
 
-        self.norm_f = (nn.LayerNorm if not rms_norm else RMSNorm)(
-            d_model, eps=norm_epsilon, **factory_kwargs
-        )
+        self.norm_f = (nn.LayerNorm if not rms_norm else RMSNorm)(d_model, eps=norm_epsilon, **factory_kwargs)
 
         self.apply(
             partial(
@@ -191,9 +181,7 @@ class MixerModel(nn.Module):
         hidden_states = self.embedding(input_ids)
         residual = None
         for layer in self.layers:
-            hidden_states, residual = layer(
-                hidden_states, residual, inference_params=inference_params
-            )
+            hidden_states, residual = layer(hidden_states, residual, inference_params=inference_params)
         if not self.fused_add_norm:
             residual = (hidden_states + residual) if residual is not None else hidden_states
             hidden_states = self.norm_f(residual.to(dtype=self.norm_f.weight.dtype))
@@ -207,13 +195,12 @@ class MixerModel(nn.Module):
                 residual=residual,
                 prenorm=False,
                 residual_in_fp32=self.residual_in_fp32,
-                is_rms_norm=isinstance(self.norm_f, RMSNorm)
+                is_rms_norm=isinstance(self.norm_f, RMSNorm),
             )
         return hidden_states
 
 
 class MambaLMHeadModel(nn.Module, GenerationMixin):
-
     def __init__(
         self,
         config: MambaConfig,
@@ -272,9 +259,8 @@ class MambaLMHeadModel(nn.Module, GenerationMixin):
         return self.backbone.allocate_inference_cache(batch_size, max_seqlen, dtype=dtype, **kwargs)
 
     def forward(self, input_ids, position_ids=None, inference_params=None, num_last_tokens=0, **mixer_kwargs):
-        """
-        "position_ids" is just to be compatible with Transformer generation. We don't use it.
-        num_last_tokens: if > 0, only return the logits for the last n tokens
+        """"position_ids" is just to be compatible with Transformer generation. We don't use it. num_last_tokens: if >
+        0, only return the logits for the last n tokens.
         """
         hidden_states = self.backbone(input_ids, inference_params=inference_params, **mixer_kwargs)
         if num_last_tokens > 0:
@@ -292,18 +278,17 @@ class MambaLMHeadModel(nn.Module, GenerationMixin):
         return model
 
     def save_pretrained(self, save_directory):
-        """
-        Minimal implementation of save_pretrained for MambaLMHeadModel.
-        Save the model and its configuration file to a directory.
+        """Minimal implementation of save_pretrained for MambaLMHeadModel. Save the model and its configuration file to
+        a directory.
         """
         # Ensure save_directory exists
         os.makedirs(save_directory, exist_ok=True)
 
         # Save the model's state_dict
-        model_path = os.path.join(save_directory, 'pytorch_model.bin')
+        model_path = os.path.join(save_directory, "pytorch_model.bin")
         torch.save(self.state_dict(), model_path)
 
         # Save the configuration of the model
-        config_path = os.path.join(save_directory, 'config.json')
-        with open(config_path, 'w') as f:
+        config_path = os.path.join(save_directory, "config.json")
+        with open(config_path, "w") as f:
             json.dump(self.config.__dict__, f, indent=4)

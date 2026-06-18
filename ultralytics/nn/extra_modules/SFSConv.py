@@ -1,4 +1,5 @@
 import math
+
 import numpy as np
 import thop
 import torch
@@ -20,17 +21,9 @@ class Conv(nn.Module):
 
     def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=True):
         super().__init__()
-        self.conv = nn.Conv2d(
-            c1, c2, k, s, autopad(k, p, d), groups=g, dilation=d, bias=False
-        )
+        self.conv = nn.Conv2d(c1, c2, k, s, autopad(k, p, d), groups=g, dilation=d, bias=False)
         self.bn = nn.BatchNorm2d(c2)
-        self.act = (
-            self.default_act
-            if act is True
-            else act
-            if isinstance(act, nn.Module)
-            else nn.Identity()
-        )
+        self.act = self.default_act if act is True else act if isinstance(act, nn.Module) else nn.Identity()
 
     def forward(self, x):
         c = self.conv(x)
@@ -57,13 +50,18 @@ class SpatialAttention(nn.Module):
         self.act = nn.Sigmoid()
 
     def forward(self, x):
-        x = self.cv1(torch.cat([torch.mean(x, 1, keepdim=True), torch.max(x, 1, keepdim=True)[0]], 1,))
+        x = self.cv1(
+            torch.cat(
+                [torch.mean(x, 1, keepdim=True), torch.max(x, 1, keepdim=True)[0]],
+                1,
+            )
+        )
         return self.act(x)
 
 
 class FractionalGaborFilter(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, order, angles, scales):
-        super(FractionalGaborFilter, self).__init__()
+        super().__init__()
 
         self.real_weights = nn.ParameterList()
         self.imag_weights = nn.ParameterList()
@@ -71,12 +69,13 @@ class FractionalGaborFilter(nn.Module):
         for angle in angles:
             for scale in scales:
                 # real_weight, imag_weight = self.generate_fractional_gabor(in_channels, out_channels, kernel_size, order, angle, scale)
-                real_weight = self.generate_fractional_gabor(in_channels, out_channels, kernel_size, order, angle, scale)
+                real_weight = self.generate_fractional_gabor(
+                    in_channels, out_channels, kernel_size, order, angle, scale
+                )
                 self.real_weights.append(nn.Parameter(real_weight))
                 # self.imag_weights.append(nn.Parameter(imag_weight))
 
-    def generate_fractional_gabor(
-        self, in_channels, out_channels, size, order, angle, scale):
+    def generate_fractional_gabor(self, in_channels, out_channels, size, order, angle, scale):
 
         x, y = np.meshgrid(np.linspace(-1, 1, size[0]), np.linspace(-1, 1, size[1]))
         x_theta = x * np.cos(angle) + y * np.sin(angle)
@@ -107,7 +106,7 @@ class FractionalGaborFilter(nn.Module):
 
 class GaborSingle(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, order, angles, scales):
-        super(GaborSingle, self).__init__()
+        super().__init__()
         self.gabor = FractionalGaborFilter(in_channels, out_channels, kernel_size, order, angles, scales)
         self.t = nn.Parameter(
             torch.randn(out_channels, in_channels, kernel_size[0], kernel_size[1]),
@@ -135,16 +134,14 @@ class GaborFPU(nn.Module):
         angles=[0, 45, 90, 135],
         scales=[1, 2, 3, 4],
     ):
-        super(GaborFPU, self).__init__()
+        super().__init__()
         self.gabor = GaborSingle(in_channels // 4, out_channels // 4, (3, 3), order, angles, scales)
         self.fc = nn.Conv2d(out_channels, out_channels, kernel_size=1)
 
     def forward(self, x):
         channels_per_group = x.shape[1] // 4
         x1, x2, x3, x4 = torch.split(x, channels_per_group, 1)
-        x_out = torch.cat(
-            [self.gabor(x1), self.gabor(x2), self.gabor(x3), self.gabor(x4)], dim=1
-        )
+        x_out = torch.cat([self.gabor(x1), self.gabor(x2), self.gabor(x3), self.gabor(x4)], dim=1)
         x_out = self.fc(x_out)
         if x.shape[1] == x_out.shape[1]:
             x_out = x_out + x
@@ -153,7 +150,7 @@ class GaborFPU(nn.Module):
 
 class FrFTFilter(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, f, order):
-        super(FrFTFilter, self).__init__()
+        super().__init__()
 
         self.register_buffer(
             "weight",
@@ -174,7 +171,7 @@ class FrFTFilter(nn.Module):
         for i in range(N):
             real_FrFT_filterX[:, :, i] = np.cos(-f * (X) / math.sin(p) + (f * f + X * X) / (2 * math.tan(p)))
             real_FrFT_filterY[:, :, i] = np.cos(-f * (Y) / math.sin(p) + (f * f + Y * Y) / (2 * math.tan(p)))
-            real_FrFT_filter[:, :, i] = (real_FrFT_filterY[:, :, i] * real_FrFT_filterX[:, :, i])
+            real_FrFT_filter[:, :, i] = real_FrFT_filterY[:, :, i] * real_FrFT_filterX[:, :, i]
         g_f = np.zeros((kernel[0], kernel[1], in_channels, out_channels))
         for i in range(N):
             g_f[:, :, :, i] = np.repeat(real_FrFT_filter[:, :, i : i + 1], in_channels, axis=2)
@@ -237,8 +234,8 @@ class FourierFPU(nn.Module):
 class SPU(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
-        self.c1 = Conv(in_channels // 2, in_channels // 2, 3, g= in_channels // 2)
-        self.c2 = Conv(in_channels // 2, in_channels // 2, 5, g= in_channels // 2)
+        self.c1 = Conv(in_channels // 2, in_channels // 2, 3, g=in_channels // 2)
+        self.c2 = Conv(in_channels // 2, in_channels // 2, 5, g=in_channels // 2)
         self.c3 = Conv(in_channels, out_channels, 1)
 
     def forward(self, x):
@@ -253,8 +250,7 @@ class SPU(nn.Module):
 
 
 class SFS_Conv(nn.Module):
-    def __init__(
-        self, in_channels, out_channels, order=0.25, filter="FrGT"):
+    def __init__(self, in_channels, out_channels, order=0.25, filter="FrGT"):
         super().__init__()
         self.PWC0 = Conv(in_channels, in_channels // 2, 1)
         self.PWC1 = Conv(in_channels, in_channels // 2, 1)
@@ -281,8 +277,8 @@ class SFS_Conv(nn.Module):
 
         return self.PWC_o(out1 + out2)
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     channel = 256
     height = width = 20
     model = SFS_Conv(channel, channel)
