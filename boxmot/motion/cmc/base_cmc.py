@@ -3,39 +3,33 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Optional, Tuple, Union
+from typing import Union
 
 import cv2
 import numpy as np
 
-
-Scale = Union[float, Tuple[int, int], None]
+Scale = Union[float, tuple[int, int], None]
 
 
 class BaseCMC(ABC):
-    """
-    Base class for camera motion compensation (CMC) modules.
+    """Base class for camera motion compensation (CMC) modules.
 
     Contract:
-      - `apply(img, dets)` returns an affine warp matrix (2x3) or homography (3x3),
+    - `apply(img, dets)` returns an affine warp matrix (2x3) or homography (3x3),
         depending on the method and configuration.
-      - `dets` is expected in tlbr format (x1, y1, x2, y2) in *original image scale*.
+    - `dets` is expected in tlbr format (x1, y1, x2, y2) in *original image scale*.
     """
 
     grayscale: bool = True
     scale: Scale = 0.15
 
     @abstractmethod
-    def apply(self, img: np.ndarray, dets: Optional[np.ndarray] = None) -> np.ndarray:
+    def apply(self, img: np.ndarray, dets: np.ndarray | None = None) -> np.ndarray:
         raise NotImplementedError
 
     def preprocess(self, img: np.ndarray) -> np.ndarray:
-        """
-        Convert BGR->GRAY (optional) and resize (optional).
-        Supports:
-          - scale as float (fx, fy)
-          - scale as (W, H) target size
-          - None => no resize
+        """Convert BGR->GRAY (optional) and resize (optional). Supports: - scale as float (fx, fy) - scale as (W, H)
+        target size - None => no resize.
         """
         if img is None or not hasattr(img, "shape"):
             raise ValueError("Expected img to be a valid numpy array.")
@@ -62,12 +56,9 @@ class BaseCMC(ABC):
 
         return out
 
-    def generate_mask(self, img_gray: np.ndarray, dets: Optional[np.ndarray], scale: float) -> np.ndarray:
-        """
-        Create a mask that:
-          - keeps a central safe region
-          - removes detected dynamic objects (dets)
-        `img_gray` must be a 2D grayscale image (after preprocess).
+    def generate_mask(self, img_gray: np.ndarray, dets: np.ndarray | None, scale: float) -> np.ndarray:
+        """Create a mask that: - keeps a central safe region - removes detected dynamic objects (dets) `img_gray` must
+        be a 2D grayscale image (after preprocess).
         """
         if img_gray.ndim != 2:
             raise ValueError("generate_mask expects a 2D grayscale image.")

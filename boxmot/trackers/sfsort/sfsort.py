@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 from collections import deque
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 import cv2
 import numpy as np
@@ -66,9 +66,7 @@ class Track:
         return float((angle + np.pi) % (2.0 * np.pi) - np.pi)
 
     @classmethod
-    def _align_obb_measurement(
-        cls, measurement: np.ndarray, reference: np.ndarray
-    ) -> np.ndarray:
+    def _align_obb_measurement(cls, measurement: np.ndarray, reference: np.ndarray) -> np.ndarray:
         """Align equivalent OBB forms to the current track state."""
         aligned = np.asarray(measurement, dtype=np.float32).copy().reshape(-1)
         ref = np.asarray(reference, dtype=np.float32).reshape(-1)
@@ -91,9 +89,7 @@ class Track:
         for cand_w, cand_h, cand_theta in candidates:
             theta_aligned = ref_theta + cls._wrap_angle(cand_theta - ref_theta)
             angle_cost = abs(theta_aligned - ref_theta)
-            size_cost = abs(np.log(max(cand_w, 1e-6) / ref_w)) + abs(
-                np.log(max(cand_h, 1e-6) / ref_h)
-            )
+            size_cost = abs(np.log(max(cand_w, 1e-6) / ref_w)) + abs(np.log(max(cand_h, 1e-6) / ref_h))
             cost = angle_cost + (0.05 * size_cost)
             if cost < best_cost:
                 best_cost = cost
@@ -114,9 +110,7 @@ class Track:
         if self._plot_angle is None:
             self._plot_angle = target
         else:
-            self._plot_angle = self._plot_angle + self._wrap_pi_periodic(
-                target - self._plot_angle
-            )
+            self._plot_angle = self._plot_angle + self._wrap_pi_periodic(target - self._plot_angle)
         rect = (
             (float(box[0]), float(box[1])),
             (max(float(box[2]), 1e-4), max(float(box[3]), 1e-4)),
@@ -127,15 +121,13 @@ class Track:
 
     def update(self, box: np.ndarray, frame_id: int, conf: float, cls: int, det_ind: int) -> None:
         """Update a matched track with latest detection."""
-
         incoming_bbox = np.asarray(box, dtype=np.float32).reshape(-1)
         if self.bbox.shape[0] == 5 and incoming_bbox.shape[0] == 5:
             aligned = self._align_obb_measurement(incoming_bbox, self.bbox)
             prev_theta = float(self.bbox[4])
             theta_delta = self._wrap_angle(float(aligned[4]) - prev_theta)
-            self._theta_velocity = (
-                (self.theta_damping * self._theta_velocity)
-                + ((1.0 - self.theta_damping) * theta_delta)
+            self._theta_velocity = (self.theta_damping * self._theta_velocity) + (
+                (1.0 - self.theta_damping) * theta_delta
             )
             aligned[4] = self._wrap_angle(prev_theta + self._theta_velocity)
             self.bbox = aligned.astype(np.float32)
@@ -433,17 +425,13 @@ class SFSORT(BaseTracker):
         self.r_margin = float(frame_width)
         if self.horizontal_margin is not None:
             self.l_margin = float(self.clamp(self.horizontal_margin, 0, frame_width))
-            self.r_margin = float(
-                self.clamp(frame_width - self.horizontal_margin, 0, frame_width)
-            )
+            self.r_margin = float(self.clamp(frame_width - self.horizontal_margin, 0, frame_width))
 
         self.t_margin = 0.0
         self.b_margin = float(frame_height)
         if self.vertical_margin is not None:
             self.t_margin = float(self.clamp(self.vertical_margin, 0, frame_height))
-            self.b_margin = float(
-                self.clamp(frame_height - self.vertical_margin, 0, frame_height)
-            )
+            self.b_margin = float(self.clamp(frame_height - self.vertical_margin, 0, frame_height))
 
         self._margins_ready = True
 
@@ -463,21 +451,14 @@ class SFSORT(BaseTracker):
     @staticmethod
     def _format_track(track: Track) -> list[float]:
         bbox = [float(v) for v in track.bbox.tolist()]
-        return bbox + [
-            float(track.track_id),
-            float(track.conf),
-            float(track.cls),
-            float(track.det_ind),
-        ]
+        return [*bbox, float(track.track_id), float(track.conf), float(track.cls), float(track.det_ind)]
 
     @staticmethod
     def clamp(value: float, min_value: float, max_value: float) -> float:
         return max(min_value, min(value, max_value))
 
     @staticmethod
-    def _resolve_or_default(
-        value: float | None, default: float, min_value: float, max_value: float
-    ) -> float:
+    def _resolve_or_default(value: float | None, default: float, min_value: float, max_value: float) -> float:
         resolved = default if value is None else value
         return SFSORT.clamp(resolved, min_value, max_value)
 
@@ -531,12 +512,8 @@ class SFSORT(BaseTracker):
         box2_width = boxes[:, 2]
         box1_height = active_boxes[:, 3]
         box2_height = boxes[:, 3]
-        sw = np.minimum(box1_width[:, None], box2_width) / (
-            np.maximum(box1_width[:, None], box2_width) + eps
-        )
-        sh = np.minimum(box1_height[:, None], box2_height) / (
-            np.maximum(box1_height[:, None], box2_height) + eps
-        )
+        sw = np.minimum(box1_width[:, None], box2_width) / (np.maximum(box1_width[:, None], box2_width) + eps)
+        sh = np.minimum(box1_height[:, None], box2_height) / (np.maximum(box1_height[:, None], box2_height) + eps)
 
         return SFSORT._combine_cost_terms(
             iou=iou,
@@ -560,12 +537,8 @@ class SFSORT(BaseTracker):
         b1_x1, b1_y1, b1_x2, b1_y2 = active_boxes.T
         b2_x1, b2_y1, b2_x2, b2_y2 = boxes.T
 
-        h_intersection = (
-            np.minimum(b1_x2[:, None], b2_x2) - np.maximum(b1_x1[:, None], b2_x1)
-        ).clip(0)
-        w_intersection = (
-            np.minimum(b1_y2[:, None], b2_y2) - np.maximum(b1_y1[:, None], b2_y1)
-        ).clip(0)
+        h_intersection = (np.minimum(b1_x2[:, None], b2_x2) - np.maximum(b1_x1[:, None], b2_x1)).clip(0)
+        w_intersection = (np.minimum(b1_y2[:, None], b2_y2) - np.maximum(b1_y1[:, None], b2_y1)).clip(0)
 
         intersection = h_intersection * w_intersection
 

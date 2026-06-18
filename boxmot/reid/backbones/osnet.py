@@ -1,6 +1,5 @@
 # Mikel Broström 🔥 BoxMOT 🧾 AGPL-3.0 license
 
-from __future__ import absolute_import, division
 
 import warnings
 
@@ -8,7 +7,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-__all__ = ["osnet_x1_0", "osnet_x0_75", "osnet_x0_5", "osnet_x0_25", "osnet_ibn_x1_0"]
+__all__ = ["osnet_ibn_x1_0", "osnet_x0_5", "osnet_x0_25", "osnet_x0_75", "osnet_x1_0"]
 
 pretrained_urls = {
     "osnet_x1_0": "https://drive.google.com/uc?id=1LaG1EJpHrxdAxKnSCJ_i0u-nbxSAeiFY",
@@ -35,7 +34,7 @@ class ConvLayer(nn.Module):
         groups=1,
         IN=False,
     ):
-        super(ConvLayer, self).__init__()
+        super().__init__()
         self.conv = nn.Conv2d(
             in_channels,
             out_channels,
@@ -62,7 +61,7 @@ class Conv1x1(nn.Module):
     """1x1 convolution + bn + relu."""
 
     def __init__(self, in_channels, out_channels, stride=1, groups=1):
-        super(Conv1x1, self).__init__()
+        super().__init__()
         self.conv = nn.Conv2d(
             in_channels,
             out_channels,
@@ -86,10 +85,8 @@ class Conv1x1Linear(nn.Module):
     """1x1 convolution + bn (w/o non-linearity)."""
 
     def __init__(self, in_channels, out_channels, stride=1):
-        super(Conv1x1Linear, self).__init__()
-        self.conv = nn.Conv2d(
-            in_channels, out_channels, 1, stride=stride, padding=0, bias=False
-        )
+        super().__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, 1, stride=stride, padding=0, bias=False)
         self.bn = nn.BatchNorm2d(out_channels)
 
     def forward(self, x):
@@ -102,7 +99,7 @@ class Conv3x3(nn.Module):
     """3x3 convolution + bn + relu."""
 
     def __init__(self, in_channels, out_channels, stride=1, groups=1):
-        super(Conv3x3, self).__init__()
+        super().__init__()
         self.conv = nn.Conv2d(
             in_channels,
             out_channels,
@@ -129,10 +126,8 @@ class LightConv3x3(nn.Module):
     """
 
     def __init__(self, in_channels, out_channels):
-        super(LightConv3x3, self).__init__()
-        self.conv1 = nn.Conv2d(
-            in_channels, out_channels, 1, stride=1, padding=0, bias=False
-        )
+        super().__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels, 1, stride=1, padding=0, bias=False)
         self.conv2 = nn.Conv2d(
             out_channels,
             out_channels,
@@ -168,21 +163,17 @@ class ChannelGate(nn.Module):
         reduction=16,
         layer_norm=False,
     ):
-        super(ChannelGate, self).__init__()
+        super().__init__()
         if num_gates is None:
             num_gates = in_channels
         self.return_gates = return_gates
         self.global_avgpool = nn.AdaptiveAvgPool2d(1)
-        self.fc1 = nn.Conv2d(
-            in_channels, in_channels // reduction, kernel_size=1, bias=True, padding=0
-        )
+        self.fc1 = nn.Conv2d(in_channels, in_channels // reduction, kernel_size=1, bias=True, padding=0)
         self.norm1 = None
         if layer_norm:
             self.norm1 = nn.LayerNorm((in_channels // reduction, 1, 1))
         self.relu = nn.ReLU(inplace=True)
-        self.fc2 = nn.Conv2d(
-            in_channels // reduction, num_gates, kernel_size=1, bias=True, padding=0
-        )
+        self.fc2 = nn.Conv2d(in_channels // reduction, num_gates, kernel_size=1, bias=True, padding=0)
         if gate_activation == "sigmoid":
             self.gate_activation = nn.Sigmoid()
         elif gate_activation == "relu":
@@ -190,7 +181,7 @@ class ChannelGate(nn.Module):
         elif gate_activation == "linear":
             self.gate_activation = None
         else:
-            raise RuntimeError("Unknown gate activation: {}".format(gate_activation))
+            raise RuntimeError(f"Unknown gate activation: {gate_activation}")
 
     def forward(self, x):
         input = x
@@ -210,10 +201,8 @@ class ChannelGate(nn.Module):
 class OSBlock(nn.Module):
     """Omni-scale feature learning block."""
 
-    def __init__(
-        self, in_channels, out_channels, IN=False, bottleneck_reduction=4, **kwargs
-    ):
-        super(OSBlock, self).__init__()
+    def __init__(self, in_channels, out_channels, IN=False, bottleneck_reduction=4, **kwargs):
+        super().__init__()
         mid_channels = out_channels // bottleneck_reduction
         self.conv1 = Conv1x1(in_channels, mid_channels)
         self.conv2a = LightConv3x3(mid_channels, mid_channels)
@@ -264,7 +253,7 @@ class OSBlock(nn.Module):
 class OSNet(nn.Module):
     """Omni-Scale Network.
 
-    Reference:
+    References:
         - Zhou et al. Omni-Scale Feature Learning for Person Re-Identification. ICCV, 2019.
         - Zhou et al. Learning Generalisable Omni-Scale Representations
           for Person Re-Identification. TPAMI, 2021.
@@ -281,7 +270,7 @@ class OSNet(nn.Module):
         IN=False,
         **kwargs,
     ):
-        super(OSNet, self).__init__()
+        super().__init__()
         num_blocks = len(blocks)
         assert num_blocks == len(layers)
         assert num_blocks == len(channels) - 1
@@ -299,26 +288,18 @@ class OSNet(nn.Module):
             reduce_spatial_size=True,
             IN=IN,
         )
-        self.conv3 = self._make_layer(
-            blocks[1], layers[1], channels[1], channels[2], reduce_spatial_size=True
-        )
-        self.conv4 = self._make_layer(
-            blocks[2], layers[2], channels[2], channels[3], reduce_spatial_size=False
-        )
+        self.conv3 = self._make_layer(blocks[1], layers[1], channels[1], channels[2], reduce_spatial_size=True)
+        self.conv4 = self._make_layer(blocks[2], layers[2], channels[2], channels[3], reduce_spatial_size=False)
         self.conv5 = Conv1x1(channels[3], channels[3])
         self.global_avgpool = nn.AdaptiveAvgPool2d(1)
         # fully connected layer
-        self.fc = self._construct_fc_layer(
-            self.feature_dim, channels[3], dropout_p=None
-        )
+        self.fc = self._construct_fc_layer(self.feature_dim, channels[3], dropout_p=None)
         # identity classification layer
         self.classifier = nn.Linear(self.feature_dim, num_classes)
 
         self._init_params()
 
-    def _make_layer(
-        self, block, layer, in_channels, out_channels, reduce_spatial_size, IN=False
-    ):
+    def _make_layer(self, block, layer, in_channels, out_channels, reduce_spatial_size, IN=False):
         layers = []
 
         layers.append(block(in_channels, out_channels, IN=IN))
@@ -326,11 +307,7 @@ class OSNet(nn.Module):
             layers.append(block(out_channels, out_channels, IN=IN))
 
         if reduce_spatial_size:
-            layers.append(
-                nn.Sequential(
-                    Conv1x1(out_channels, out_channels), nn.AvgPool2d(2, stride=2)
-                )
-            )
+            layers.append(nn.Sequential(Conv1x1(out_channels, out_channels), nn.AvgPool2d(2, stride=2)))
 
         return nn.Sequential(*layers)
 
@@ -400,7 +377,7 @@ class OSNet(nn.Module):
         elif self.loss == "triplet":
             return y, v
         else:
-            raise KeyError("Unsupported loss: {}".format(self.loss))
+            raise KeyError(f"Unsupported loss: {self.loss}")
 
 
 def init_pretrained_weights(model, key=""):
@@ -463,21 +440,14 @@ def init_pretrained_weights(model, key=""):
 
     if len(matched_layers) == 0:
         warnings.warn(
-            'The pretrained weights from "{}" cannot be loaded, '
+            f'The pretrained weights from "{cached_file}" cannot be loaded, '
             "please check the key names manually "
-            "(** ignored and continue **)".format(cached_file)
+            "(** ignored and continue **)"
         )
     else:
-        print(
-            'Successfully loaded imagenet pretrained weights from "{}"'.format(
-                cached_file
-            )
-        )
+        print(f'Successfully loaded imagenet pretrained weights from "{cached_file}"')
         if len(discarded_layers) > 0:
-            print(
-                "** The following layers are discarded "
-                "due to unmatched keys or layer size: {}".format(discarded_layers)
-            )
+            print(f"** The following layers are discarded due to unmatched keys or layer size: {discarded_layers}")
 
 
 ##########

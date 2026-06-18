@@ -12,11 +12,7 @@ PROJECT_ROOT = PRUNE_ROOT.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-DEFAULT_WEIGHTS = (
-    PRUNE_ROOT
-    / "yolo26_structured_prune"
-    / "yolo26n_structured_pruned_0.20_20260514_192659.pt"
-)
+DEFAULT_WEIGHTS = PRUNE_ROOT / "yolo26_structured_prune" / "yolo26n_structured_pruned_0.20_20260514_192659.pt"
 DEFAULT_DATA = PROJECT_ROOT / "data.yaml"
 DEFAULT_OUTPUT_DIR = PRUNE_ROOT / "performance_results"
 

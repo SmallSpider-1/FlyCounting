@@ -1,4 +1,4 @@
-""" run_mot_challenge.py
+"""run_mot_challenge.py.
 
 Run example:
 run_mot_challenge.py --USE_PARALLEL False --METRICS Hota --TRACKERS_TO_EVAL Lif_T
@@ -32,9 +32,8 @@ Command Line Arguments: Defaults, # Comments
         'METRICS': ['HOTA', 'CLEAR', 'Identity', 'VACE']
 """
 
-import sys
-import os
 import argparse
+import sys
 from multiprocessing import freeze_support
 from pathlib import Path
 
@@ -51,53 +50,53 @@ sys.path.insert(0, str(current_dir))
 import trackeval  # noqa: E402
 from custom_mot_challenge_2d_box import CustomMotChallenge2DBox
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     freeze_support()
 
     # Command line interface:
     default_eval_config = trackeval.Evaluator.get_default_eval_config()
-    default_eval_config['DISPLAY_LESS_PROGRESS'] = False
-    
+    default_eval_config["DISPLAY_LESS_PROGRESS"] = False
+
     # Use CustomMotChallenge2DBox for default config
     default_dataset_config = CustomMotChallenge2DBox.get_default_dataset_config()
-    
-    default_metrics_config = {'METRICS': ['HOTA', 'CLEAR', 'Identity'], 'THRESHOLD': 0.5}
+
+    default_metrics_config = {"METRICS": ["HOTA", "CLEAR", "Identity"], "THRESHOLD": 0.5}
     config = {**default_eval_config, **default_dataset_config, **default_metrics_config}  # Merge default configs
     parser = argparse.ArgumentParser()
     for setting in config.keys():
-        if setting == 'DISTRACTOR_CLASS_IDS':
-            parser.add_argument("--" + setting, nargs='*')  # allow empty list
+        if setting == "DISTRACTOR_CLASS_IDS":
+            parser.add_argument("--" + setting, nargs="*")  # allow empty list
         elif type(config[setting]) == list or type(config[setting]) == type(None):
-            parser.add_argument("--" + setting, nargs='+')
+            parser.add_argument("--" + setting, nargs="+")
         else:
             parser.add_argument("--" + setting)
     args = parser.parse_args().__dict__
     for setting in args.keys():
         if args[setting] is not None:
-            if type(config[setting]) == type(True):
-                if args[setting] == 'True':
+            if type(config[setting]) == bool:
+                if args[setting] == "True":
                     x = True
-                elif args[setting] == 'False':
+                elif args[setting] == "False":
                     x = False
                 else:
-                    raise Exception('Command line parameter ' + setting + 'must be True or False')
-            elif type(config[setting]) == type(1):
+                    raise Exception("Command line parameter " + setting + "must be True or False")
+            elif type(config[setting]) == int:
                 x = int(args[setting])
             elif type(args[setting]) == type(None):
                 x = None
-            elif setting == 'SEQ_INFO':
+            elif setting == "SEQ_INFO":
                 seq_info_dict = {}
                 for entry in args[setting]:
-                    if ':' in entry:
-                        name, length = entry.split(':', 1)
+                    if ":" in entry:
+                        name, length = entry.split(":", 1)
                         seq_info_dict[name] = int(length) if length else None
-                    elif '=' in entry:
-                        name, length = entry.split('=', 1)
+                    elif "=" in entry:
+                        name, length = entry.split("=", 1)
                         seq_info_dict[name] = int(length) if length else None
                     else:
                         seq_info_dict[entry] = None
                 x = seq_info_dict
-            elif setting in {'CLASS_IDS', 'DISTRACTOR_CLASS_IDS'}:
+            elif setting in {"CLASS_IDS", "DISTRACTOR_CLASS_IDS"}:
                 x = [int(v) for v in args[setting]] if args[setting] is not None else []
             else:
                 x = args[setting]
@@ -112,8 +111,8 @@ if __name__ == '__main__':
     dataset_list = [CustomMotChallenge2DBox(dataset_config)]
     metrics_list = []
     for metric in [trackeval.metrics.HOTA, trackeval.metrics.CLEAR, trackeval.metrics.Identity, trackeval.metrics.VACE]:
-        if metric.get_name() in metrics_config['METRICS']:
+        if metric.get_name() in metrics_config["METRICS"]:
             metrics_list.append(metric(metrics_config))
     if len(metrics_list) == 0:
-        raise Exception('No metrics selected for evaluation')
+        raise Exception("No metrics selected for evaluation")
     evaluator.evaluate(dataset_list, metrics_list)

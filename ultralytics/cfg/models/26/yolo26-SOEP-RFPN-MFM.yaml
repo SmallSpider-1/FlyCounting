@@ -36,7 +36,7 @@ head:
 
   - [-1, 1, SNI, [2]]
   - [2, 1, SPDConv, [256]] # 15 (P3/8-small)
-  - [[-1, -2, 4], 1, MFM, [512]]  # cat backbone P3
+  - [[-1, -2, 4], 1, MFM, [512]] # cat backbone P3
   - [-1, 1, CSPOmniKernel, []] # 17
   - [-1, 2, C3k2, [256, False]] # 18 (P3/8-small)
 

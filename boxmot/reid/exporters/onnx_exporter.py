@@ -1,4 +1,5 @@
 import inspect
+
 import torch
 from torch.export import Dim
 
@@ -54,10 +55,7 @@ class ONNXExporter(BaseExporter):
             if not self.dynamic:
                 raise
 
-            LOGGER.warning(
-                f"Dynamic export via torch.export failed ({e}). "
-                "Retrying with legacy dynamic_axes export..."
-            )
+            LOGGER.warning(f"Dynamic export via torch.export failed ({e}). Retrying with legacy dynamic_axes export...")
 
             # Fallback for torch.export/dynamo dynamic shape guard failures.
             fallback_kwargs = {
@@ -86,9 +84,7 @@ class ONNXExporter(BaseExporter):
 
         # --- IR version clamp for ONNXRuntime compatibility ---
         if getattr(model_onnx, "ir_version", 0) > 10:
-            LOGGER.info(
-                f"Limiting IR version {model_onnx.ir_version} -> 10 for ONNXRuntime compatibility..."
-            )
+            LOGGER.info(f"Limiting IR version {model_onnx.ir_version} -> 10 for ONNXRuntime compatibility...")
             model_onnx.ir_version = 10
 
         # --- Optional FP16 conversion for CPU export ---
@@ -113,9 +109,8 @@ class ONNXExporter(BaseExporter):
     # Helpers
     # -----------------
     def _best_onnx_opset(self, onnx, cuda: bool = False) -> int:
-        """
-        - If torch exposes ONNX_MAX_OPSET: use second-latest for safety, and reduce further on CUDA.
-        - Else fallback by torch major.minor mapping.
+        """- If torch exposes ONNX_MAX_OPSET: use second-latest for safety, and reduce further on CUDA. - Else fallback
+        by torch major.minor mapping.
         """
         # torch.onnx.utils._constants.ONNX_MAX_OPSET exists in newer torch; safest is "max-1"
         max_opset = getattr(getattr(torch.onnx.utils, "_constants", None), "ONNX_MAX_OPSET", None)
