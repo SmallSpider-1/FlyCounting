@@ -8,8 +8,8 @@ from .xywh import KalmanFilterXYWH
 
 __all__ = [
     "BaseKalmanFilter",
-    "KalmanFilterXYWH",
     "KalmanFilterXYAH",
     "KalmanFilterXYHR",
     "KalmanFilterXYSR",
+    "KalmanFilterXYWH",
 ]

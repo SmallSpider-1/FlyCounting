@@ -1,20 +1,35 @@
-import torch
-import torch.nn as nn
-import torch.fft
-
-from timm.layers import DropPath, trunc_normal_
 import math
 
+import torch
+import torch.fft
+import torch.nn as nn
 from einops import rearrange
+from timm.layers import DropPath, trunc_normal_
 
 try:
+    from .csms6s import (
+        CrossMerge_1,
+        CrossMerge_2,
+        CrossMerge_3,
+        CrossMerge_4,
+        CrossScan_1,
+        CrossScan_2,
+        CrossScan_3,
+        CrossScan_4,
+    )
     from .ss2d import SS2D
-    from .csms6s import CrossScan_1, CrossScan_2, CrossScan_3, CrossScan_4
-    from .csms6s import CrossMerge_1, CrossMerge_2, CrossMerge_3, CrossMerge_4
 except:
+    from csms6s import (
+        CrossMerge_1,
+        CrossMerge_2,
+        CrossMerge_3,
+        CrossMerge_4,
+        CrossScan_1,
+        CrossScan_2,
+        CrossScan_3,
+        CrossScan_4,
+    )
     from ss2d import SS2D
-    from csms6s import CrossScan_1, CrossScan_2, CrossScan_3, CrossScan_4
-    from csms6s import CrossMerge_1, CrossMerge_2, CrossMerge_3, CrossMerge_4
 
 
 class FFN(nn.Module):
@@ -27,7 +42,7 @@ class FFN(nn.Module):
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
-            trunc_normal_(m.weight, std=.02)
+            trunc_normal_(m.weight, std=0.02)
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
         elif isinstance(m, nn.LayerNorm):
@@ -46,6 +61,7 @@ class FFN(nn.Module):
         x = self.fc2(x)
         return x
 
+
 class PVT2FFN(nn.Module):
     def __init__(self, in_features, hidden_features):
         super().__init__()
@@ -57,7 +73,7 @@ class PVT2FFN(nn.Module):
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
-            trunc_normal_(m.weight, std=.02)
+            trunc_normal_(m.weight, std=0.02)
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
         elif isinstance(m, nn.LayerNorm):
@@ -77,6 +93,7 @@ class PVT2FFN(nn.Module):
         x = self.fc2(x)
         return x
 
+
 class GroupMambaLayer(nn.Module):
     def __init__(self, input_dim, output_dim, d_state=1, d_conv=3, expand=1, reduction=16):
         super().__init__()
@@ -91,30 +108,10 @@ class GroupMambaLayer(nn.Module):
         self.output_dim = output_dim
         self.norm = nn.LayerNorm(input_dim)
 
-        self.mamba_g1 = SS2D(
-            d_model=input_dim // 4,
-            d_state=d_state,
-            ssm_ratio=expand,
-            d_conv=d_conv
-        )
-        self.mamba_g2 = SS2D(
-            d_model=input_dim // 4,
-            d_state=d_state,
-            ssm_ratio=expand,
-            d_conv=d_conv
-        )
-        self.mamba_g3 = SS2D(
-            d_model=input_dim // 4,
-            d_state=d_state,
-            ssm_ratio=expand,
-            d_conv=d_conv
-        )
-        self.mamba_g4 = SS2D(
-            d_model=input_dim // 4,
-            d_state=d_state,
-            ssm_ratio=expand,
-            d_conv=d_conv
-        )
+        self.mamba_g1 = SS2D(d_model=input_dim // 4, d_state=d_state, ssm_ratio=expand, d_conv=d_conv)
+        self.mamba_g2 = SS2D(d_model=input_dim // 4, d_state=d_state, ssm_ratio=expand, d_conv=d_conv)
+        self.mamba_g3 = SS2D(d_model=input_dim // 4, d_state=d_state, ssm_ratio=expand, d_conv=d_conv)
+        self.mamba_g4 = SS2D(d_model=input_dim // 4, d_state=d_state, ssm_ratio=expand, d_conv=d_conv)
 
         self.proj = nn.Linear(input_dim, output_dim)
         self.skip_scale = nn.Parameter(torch.ones(1))
@@ -122,7 +119,7 @@ class GroupMambaLayer(nn.Module):
     def forward(self, x):
         x_dtype = x.dtype
         B, C, H, W = x.shape
-        N = H * W
+        H * W
         x = x.flatten(2).permute(0, 2, 1)
         x = self.norm(x)
 
@@ -132,7 +129,7 @@ class GroupMambaLayer(nn.Module):
         fc_out_1 = self.relu(self.fc1(z))
         fc_out_2 = self.sigmoid(self.fc2(fc_out_1))
 
-        x = rearrange(x, 'b (h w) c -> b h w c', b=B, h=H, w=W, c=C)
+        x = rearrange(x, "b (h w) c -> b h w c", b=B, h=H, w=W, c=C)
         x1, x2, x3, x4 = torch.chunk(x, 4, dim=-1)
 
         if x.dtype == torch.float16:
@@ -146,7 +143,7 @@ class GroupMambaLayer(nn.Module):
         # Combine all feature maps
         x_mamba = torch.cat([x_mamba1, x_mamba2, x_mamba3, x_mamba4], dim=-1) * self.skip_scale * x.to(x_dtype)
 
-        x_mamba = rearrange(x_mamba, 'b h w c -> b (h w) c', b=B, h=H, w=W, c=C)
+        x_mamba = rearrange(x_mamba, "b h w c -> b (h w) c", b=B, h=H, w=W, c=C)
 
         # Channel Modulation
         x_mamba = x_mamba * fc_out_2.unsqueeze(1)
@@ -156,8 +153,9 @@ class GroupMambaLayer(nn.Module):
 
         return x_mamba.permute(0, 2, 1).view([B, C, H, W])
 
+
 class ClassBlock(nn.Module):
-    def __init__(self, dim,  mlp_ratio, norm_layer=nn.LayerNorm):
+    def __init__(self, dim, mlp_ratio, norm_layer=nn.LayerNorm):
         super().__init__()
         self.norm1 = norm_layer(dim)
         self.norm2 = norm_layer(dim)
@@ -167,7 +165,7 @@ class ClassBlock(nn.Module):
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
-            trunc_normal_(m.weight, std=.02)
+            trunc_normal_(m.weight, std=0.02)
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
         elif isinstance(m, nn.LayerNorm):
@@ -186,38 +184,33 @@ class ClassBlock(nn.Module):
         cls_embed = cls_embed + self.mlp(self.norm2(cls_embed), H, W)
         return torch.cat([cls_embed, x[:, 1:]], dim=1)
 
+
 class LayerNorm2d(nn.Module):
     def __init__(self, dim):
         super().__init__()
         self.norm = nn.LayerNorm(dim, eps=1e-6)
 
     def forward(self, x: torch.Tensor):
-        '''
-        x: (b c h w)
-        '''
-        x = x.permute(0, 2, 3, 1).contiguous() #(b h w c)
-        x = self.norm(x) #(b h w c)
+        """X: (b c h w)."""
+        x = x.permute(0, 2, 3, 1).contiguous()  # (b h w c)
+        x = self.norm(x)  # (b h w c)
         x = x.permute(0, 3, 1, 2).contiguous()
         return x
 
+
 class Block_mamba(nn.Module):
-    def __init__(self, 
-        dim, 
-        mlp_ratio=2,
-        drop_path=0., 
-        norm_layer=LayerNorm2d
-    ):
+    def __init__(self, dim, mlp_ratio=2, drop_path=0.0, norm_layer=LayerNorm2d):
         super().__init__()
         self.norm2 = norm_layer(dim)
 
         self.attn = GroupMambaLayer(dim, dim)
         self.mlp = PVT2FFN(in_features=dim, hidden_features=int(dim * mlp_ratio))
-        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+        self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
         self.apply(self._init_weights)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
-            trunc_normal_(m.weight, std=.02)
+            trunc_normal_(m.weight, std=0.02)
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
         elif isinstance(m, nn.LayerNorm):
@@ -235,6 +228,7 @@ class Block_mamba(nn.Module):
         x = x + self.drop_path(self.mlp(self.norm2(x)))
         return x
 
+
 class DownSamples(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
@@ -244,7 +238,7 @@ class DownSamples(nn.Module):
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
-            trunc_normal_(m.weight, std=.02)
+            trunc_normal_(m.weight, std=0.02)
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
         elif isinstance(m, nn.LayerNorm):
@@ -264,36 +258,30 @@ class DownSamples(nn.Module):
         x = self.norm(x)
         return x, H, W
 
+
 class Stem(nn.Module):
     def __init__(self, in_channels, stem_hidden_dim, out_channels):
         super().__init__()
         hidden_dim = stem_hidden_dim
         self.conv = nn.Sequential(
-            nn.Conv2d(in_channels, hidden_dim, kernel_size=7, stride=2,
-                      padding=3, bias=False),  # 112x112
+            nn.Conv2d(in_channels, hidden_dim, kernel_size=7, stride=2, padding=3, bias=False),  # 112x112
             nn.BatchNorm2d(hidden_dim),
             nn.ReLU(inplace=True),
-            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=3, stride=1,
-                      padding=1, bias=False),  # 112x112
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=3, stride=1, padding=1, bias=False),  # 112x112
             nn.BatchNorm2d(hidden_dim),
             nn.ReLU(inplace=True),
-            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=3, stride=1,
-                      padding=1, bias=False),  # 112x112
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=3, stride=1, padding=1, bias=False),  # 112x112
             nn.BatchNorm2d(hidden_dim),
             nn.ReLU(inplace=True),
         )
-        self.proj = nn.Conv2d(hidden_dim,
-                              out_channels,
-                              kernel_size=3,
-                              stride=2,
-                              padding=1)
+        self.proj = nn.Conv2d(hidden_dim, out_channels, kernel_size=3, stride=2, padding=1)
         self.norm = nn.LayerNorm(out_channels)
 
         self.apply(self._init_weights)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
-            trunc_normal_(m.weight, std=.02)
+            trunc_normal_(m.weight, std=0.02)
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
         elif isinstance(m, nn.LayerNorm):
@@ -314,19 +302,21 @@ class Stem(nn.Module):
         x = self.norm(x)
         return x, H, W
 
+
 class GroupMamba(nn.Module):
-    def __init__(self, 
-        in_chans=3, 
-        num_classes=1000, 
-        stem_hidden_dim = 32,
+    def __init__(
+        self,
+        in_chans=3,
+        num_classes=1000,
+        stem_hidden_dim=32,
         embed_dims=[64, 128, 348, 448],
-        mlp_ratios=[8, 8, 4, 4], 
-        drop_path_rate=0., 
+        mlp_ratios=[8, 8, 4, 4],
+        drop_path_rate=0.0,
         norm_layer=nn.LayerNorm,
         depths=[3, 4, 6, 3],
         num_stages=4,
         distillation=True,
-        **kwargs
+        **kwargs,
     ):
         super().__init__()
         self.num_classes = num_classes
@@ -340,12 +330,14 @@ class GroupMamba(nn.Module):
                 patch_embed = Stem(in_chans, stem_hidden_dim, embed_dims[i])
             else:
                 patch_embed = DownSamples(embed_dims[i - 1], embed_dims[i])
-            block = nn.ModuleList([Block_mamba(
-                    dim = embed_dims[i],
-                    mlp_ratio = mlp_ratios[i],
-                    drop_path=dpr[cur + j],
-                    norm_layer=norm_layer)
-                for j in range(depths[i])])
+            block = nn.ModuleList(
+                [
+                    Block_mamba(
+                        dim=embed_dims[i], mlp_ratio=mlp_ratios[i], drop_path=dpr[cur + j], norm_layer=norm_layer
+                    )
+                    for j in range(depths[i])
+                ]
+            )
 
             norm = norm_layer(embed_dims[i])
             cur += depths[i]
@@ -354,14 +346,13 @@ class GroupMamba(nn.Module):
             setattr(self, f"block{i + 1}", block)
             setattr(self, f"norm{i + 1}", norm)
 
-        post_layers = ['ca']
-        self.post_network = nn.ModuleList([
-            ClassBlock(
-                dim = embed_dims[-1], 
-                mlp_ratio = mlp_ratios[-1],
-                norm_layer=norm_layer)
-            for _ in range(len(post_layers))
-        ])
+        post_layers = ["ca"]
+        self.post_network = nn.ModuleList(
+            [
+                ClassBlock(dim=embed_dims[-1], mlp_ratio=mlp_ratios[-1], norm_layer=norm_layer)
+                for _ in range(len(post_layers))
+            ]
+        )
 
         # classification head
         self.head = nn.Linear(embed_dims[-1], num_classes) if num_classes > 0 else nn.Identity()
@@ -369,15 +360,13 @@ class GroupMamba(nn.Module):
         # distillation head
         self.dist = distillation
         if self.dist:
-            self.dist_head = nn.Linear(
-                embed_dims[-1], num_classes) if num_classes > 0 \
-                else nn.Identity()
+            self.dist_head = nn.Linear(embed_dims[-1], num_classes) if num_classes > 0 else nn.Identity()
 
         self.apply(self._init_weights)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
-            trunc_normal_(m.weight, std=.02)
+            trunc_normal_(m.weight, std=0.02)
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
         elif isinstance(m, nn.LayerNorm):
@@ -405,7 +394,7 @@ class GroupMamba(nn.Module):
             x, H, W = patch_embed(x)
             for blk in block:
                 x = blk(x, H, W)
-            
+
             if i != self.num_stages - 1:
                 norm = getattr(self, f"norm{i + 1}")
                 x = norm(x)
@@ -431,11 +420,11 @@ class GroupMamba(nn.Module):
 
 class DWConv(nn.Module):
     def __init__(self, dim=768):
-        super(DWConv, self).__init__()
+        super().__init__()
         self.dwconv = nn.Conv2d(dim, dim, 3, 1, 1, bias=True, groups=dim)
 
     def forward(self, x):
-        B, N, C = x.shape
+        B, _N, C = x.shape
         x = x.transpose(1, 2).view(B, C, H, W)
         x = self.dwconv(x)
         x = x.flatten(2).transpose(1, 2)

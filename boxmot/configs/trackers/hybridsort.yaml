@@ -6,7 +6,7 @@ low_thresh:
 delta_t:
   type: randint
   default: 3
-  range: [1, 6]  # upper bound exclusive
+  range: [1, 6] # upper bound exclusive
 
 inertia:
   type: uniform
@@ -26,7 +26,7 @@ use_custom_kf:
 longterm_bank_length:
   type: qrandint
   default: 30
-  range: [10, 61, 10]  # step size 10
+  range: [10, 61, 10] # step size 10
 
 alpha:
   type: uniform

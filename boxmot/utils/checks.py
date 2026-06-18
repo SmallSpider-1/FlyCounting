@@ -1,36 +1,34 @@
-import shutil
+from __future__ import annotations
+
 import subprocess
-import sys
+from collections.abc import Iterable, Sequence
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Iterable, Optional, Sequence
 
 from packaging.requirements import Requirement
 
+from boxmot.utils import ROOT
+
 # Replace this import with your logger, or use logging.getLogger(__name__)
-from boxmot.utils import logger as LOGGER, ROOT
+from boxmot.utils import logger as LOGGER
 
 REQUIREMENTS_FILE = Path("requirements.txt")
 
 
 class RequirementsChecker:
-    """
-    Runtime dependency helper.
+    """Runtime dependency helper.
 
     Features:
-      - Check/install a list of requirement specifiers (e.g., ["yolox", "onnx>=1.15"])
-      - Read and install from a requirements.txt
-      - Install a uv dependency *group* (requires uv)
-      - Install a project *extra* (PEP 621 optional-dependencies) via uv
-      - Backward-compatible alias: `cmds` == `extra_args`
+    - Check/install a list of requirement specifiers (e.g., ["yolox", "onnx>=1.15"])
+    - Read and install from a requirements.txt
+    - Install a uv dependency *group* (requires uv)
+    - Install a project *extra* (PEP 621 optional-dependencies) via uv
+    - Backward-compatible alias: `cmds` == `extra_args`
     """
 
-    def __init__(
-        self, group: Optional[str] = None, requirements_file: Path = REQUIREMENTS_FILE
-    ):
-        """
-        If `group` is provided, you *may* choose to call `sync_group_or_extra(group=group)`
-        before doing work. Otherwise you can use `check_requirements_file()` or `check_packages()`.
+    def __init__(self, group: str | None = None, requirements_file: Path = REQUIREMENTS_FILE):
+        """If `group` is provided, you *may* choose to call `sync_group_or_extra(group=group)` before doing work.
+        Otherwise you can use `check_requirements_file()` or `check_packages()`.
         """
         self.group = group
         self.requirements_file = requirements_file
@@ -40,8 +38,8 @@ class RequirementsChecker:
     def check_packages(
         self,
         requirements: Iterable[str],
-        extra_args: Optional[Sequence[str]] = None,
-        cmds: Optional[Sequence[str]] = None,  # legacy alias
+        extra_args: Sequence[str] | None = None,
+        cmds: Sequence[str] | None = None,  # legacy alias
     ):
         """
         Check & install packages specified by requirement strings.
@@ -64,12 +62,8 @@ class RequirementsChecker:
                 LOGGER.error(f"Package {name!r} is not installed.")
                 missing.append(str(req))
             else:
-                if req.specifier and not req.specifier.contains(
-                    inst_ver, prereleases=True
-                ):
-                    LOGGER.error(
-                        f"{name!r} has version {inst_ver} which does not satisfy {req.specifier}."
-                    )
+                if req.specifier and not req.specifier.contains(inst_ver, prereleases=True):
+                    LOGGER.error(f"{name!r} has version {inst_ver} which does not satisfy {req.specifier}.")
                     missing.append(str(req))
 
         if missing:
@@ -78,12 +72,10 @@ class RequirementsChecker:
     def sync_extra(
         self,
         extra: str,
-        extra_args: Optional[Sequence[str]] = None,
+        extra_args: Sequence[str] | None = None,
     ):
-        """
-        Install a project *extra* (PEP 621 optional-dependencies).
-        - From source checkout + uv available: uv pip install -e ".[extra]"
-        - From PyPI install:                  uv pip install "boxmot[extra]"
+        """Install a project *extra* (PEP 621 optional-dependencies). - From source checkout + uv available: uv pip
+        install -e ".[extra]" - From PyPI install: uv pip install "boxmot[extra]".
         """
         if not extra:
             raise ValueError("Extra name must be provided (e.g. 'openvino', 'export').")
@@ -92,7 +84,7 @@ class RequirementsChecker:
         # Check if we are running from a source install (editable)
         # ROOT is the package root. If pyproject.toml exists there, it's an editable install.
         root_pyproject = ROOT / "pyproject.toml"
-        
+
         cmd: list[str]
 
         if root_pyproject.is_file():
@@ -116,17 +108,10 @@ class RequirementsChecker:
 
     # ---------- internals ----------
 
-    def _install_packages(
-        self, packages: Sequence[str], extra_args: Optional[Sequence[str]] = None
-    ):
-        """
-        Install an explicit list of requirement specifiers with uv.
-        """
+    def _install_packages(self, packages: Sequence[str], extra_args: Sequence[str] | None = None):
+        """Install an explicit list of requirement specifiers with uv."""
         try:
-            LOGGER.warning(
-                f"\nMissing or mismatched packages: {', '.join(packages)}\n"
-                "Attempting installation..."
-            )
+            LOGGER.warning(f"\nMissing or mismatched packages: {', '.join(packages)}\nAttempting installation...")
             cmd = ["uv", "pip", "install", "--no-cache-dir"]
 
             if extra_args:
