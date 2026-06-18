@@ -4,8 +4,7 @@ import numpy as np
 
 
 class TrackState:
-    """
-    Enum-like class for tracking states.
+    """Enum-like class for tracking states.
 
     Attributes:
         New (int): Represents a newly created track.
@@ -23,8 +22,7 @@ class TrackState:
 
 
 class BaseTrack:
-    """
-    Base class for managing the state of a track in multi-object tracking.
+    """Base class for managing the state of a track in multi-object tracking.
 
     Attributes:
         _count (int): Class variable to keep track of the number of tracks created.
@@ -60,8 +58,7 @@ class BaseTrack:
 
     @property
     def end_frame(self) -> int:
-        """
-        Returns the last frame the track was updated.
+        """Returns the last frame the track was updated.
 
         Returns:
             int: The frame ID of the last update.
@@ -70,8 +67,7 @@ class BaseTrack:
 
     @staticmethod
     def next_id() -> int:
-        """
-        Generates the next unique track ID.
+        """Generates the next unique track ID.
 
         Returns:
             int: A unique track ID.
@@ -80,8 +76,7 @@ class BaseTrack:
         return BaseTrack._count
 
     def activate(self, *args):
-        """
-        Activates the track. This method should be implemented in subclasses.
+        """Activates the track. This method should be implemented in subclasses.
 
         Args:
             *args: Variable length argument list.
@@ -92,8 +87,7 @@ class BaseTrack:
         raise NotImplementedError
 
     def predict(self):
-        """
-        Predicts the next state of the track using a motion model. This method should be implemented in subclasses.
+        """Predicts the next state of the track using a motion model. This method should be implemented in subclasses.
 
         Raises:
             NotImplementedError: If this method is not implemented in the subclass.
@@ -101,8 +95,7 @@ class BaseTrack:
         raise NotImplementedError
 
     def update(self, *args, **kwargs):
-        """
-        Updates the state of the track based on a new observation. This method should be implemented in subclasses.
+        """Updates the state of the track based on a new observation. This method should be implemented in subclasses.
 
         Args:
             *args: Variable length argument list.
@@ -114,26 +107,18 @@ class BaseTrack:
         raise NotImplementedError
 
     def mark_lost(self):
-        """
-        Marks the track as lost.
-        """
+        """Marks the track as lost."""
         self.state = TrackState.Lost
 
     def mark_long_lost(self):
-        """
-        Marks the track as long lost.
-        """
+        """Marks the track as long lost."""
         self.state = TrackState.LongLost
 
     def mark_removed(self):
-        """
-        Marks the track as removed.
-        """
+        """Marks the track as removed."""
         self.state = TrackState.Removed
 
     @staticmethod
     def clear_count():
-        """
-        Resets the track ID counter to 0.
-        """
+        """Resets the track ID counter to 0."""
         BaseTrack._count = 0

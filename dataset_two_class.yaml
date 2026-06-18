@@ -8,4 +8,4 @@ val: /home/admin1/Projects/ultralytics-yolo11-main/dataset_two_class/images/val
 nc: 2
 
 # class names
-names: ['Bactrocera correcta', 'Bactrocera dorsalis']
+names: ["Bactrocera correcta", "Bactrocera dorsalis"]

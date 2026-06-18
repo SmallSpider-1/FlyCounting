@@ -14,18 +14,16 @@ __all__ = [
     "BatchDrop",
     "BatchFeatureErase_Top",
     "BatchRandomErasing",
-    "PAM_Module",
     "CAM_Module",
     "Dual_Module",
+    "PAM_Module",
     "SE_Module",
 ]
 
 
 class BatchRandomErasing(nn.Module):
-    def __init__(
-        self, probability=0.5, sl=0.02, sh=0.4, r1=0.3, mean=[0.4914, 0.4822, 0.4465]
-    ):
-        super(BatchRandomErasing, self).__init__()
+    def __init__(self, probability=0.5, sl=0.02, sh=0.4, r1=0.3, mean=[0.4914, 0.4822, 0.4465]):
+        super().__init__()
 
         self.probability = probability
         self.mean = mean
@@ -44,8 +42,8 @@ class BatchRandomErasing(nn.Module):
                 target_area = random.uniform(self.sl, self.sh) * area
                 aspect_ratio = random.uniform(self.r1, 1 / self.r1)
 
-                h = int(round(math.sqrt(target_area * aspect_ratio)))
-                w = int(round(math.sqrt(target_area / aspect_ratio)))
+                h = round(math.sqrt(target_area * aspect_ratio))
+                w = round(math.sqrt(target_area / aspect_ratio))
 
                 if w < img.size()[3] and h < img.size()[2]:
                     x1 = random.randint(0, img.size()[2] - h)
@@ -62,14 +60,12 @@ class BatchRandomErasing(nn.Module):
 
 
 class BatchDrop(nn.Module):
-    """
-    Ref: Batch DropBlock Network for Person Re-identification and Beyond
-    https://github.com/daizuozhuo/batch-dropblock-network/blob/master/models/networks.py
-    Created by: daizuozhuo
+    """Ref: Batch DropBlock Network for Person Re-identification and Beyond
+    https://github.com/daizuozhuo/batch-dropblock-network/blob/master/models/networks.py Created by: daizuozhuo.
     """
 
     def __init__(self, h_ratio, w_ratio):
-        super(BatchDrop, self).__init__()
+        super().__init__()
         self.h_ratio = h_ratio
         self.w_ratio = w_ratio
 
@@ -87,15 +83,12 @@ class BatchDrop(nn.Module):
 
 
 class BatchDropTop(nn.Module):
-    """
-    Ref: Top-DB-Net: Top DropBlock for Activation Enhancement in Person Re-Identification
-    https://github.com/RQuispeC/top-dropblock/blob/master/torchreid/models/bdnet.py
-    Created by: RQuispeC
-
+    """Ref: Top-DB-Net: Top DropBlock for Activation Enhancement in Person Re-Identification
+    https://github.com/RQuispeC/top-dropblock/blob/master/torchreid/models/bdnet.py Created by: RQuispeC.
     """
 
     def __init__(self, h_ratio):
-        super(BatchDropTop, self).__init__()
+        super().__init__()
         self.h_ratio = h_ratio
 
     def forward(self, x, visdrop=False):
@@ -126,11 +119,8 @@ class BatchDropTop(nn.Module):
 
 
 class BatchFeatureErase_Top(nn.Module):
-    """
-    Ref: Top-DB-Net: Top DropBlock for Activation Enhancement in Person Re-Identification
-    https://github.com/RQuispeC/top-dropblock/blob/master/torchreid/models/bdnet.py
-    Created by: RQuispeC
-
+    """Ref: Top-DB-Net: Top DropBlock for Activation Enhancement in Person Re-Identification
+    https://github.com/RQuispeC/top-dropblock/blob/master/torchreid/models/bdnet.py Created by: RQuispeC.
     """
 
     def __init__(
@@ -141,7 +131,7 @@ class BatchFeatureErase_Top(nn.Module):
         w_ratio=1.0,
         double_bottleneck=False,
     ):
-        super(BatchFeatureErase_Top, self).__init__()
+        super().__init__()
 
         self.drop_batch_bottleneck = bottleneck_type(channels, 512)
 
@@ -165,7 +155,7 @@ class BatchFeatureErase_Top(nn.Module):
 
 class SE_Module(Module):
     def __init__(self, channels, reduction=4):
-        super(SE_Module, self).__init__()
+        super().__init__()
         self.fc1 = Conv2d(channels, channels // reduction, kernel_size=1, padding=0)
         self.relu = ReLU(inplace=True)
         self.fc2 = Conv2d(channels // reduction, channels, kernel_size=1, padding=0)
@@ -181,37 +171,27 @@ class SE_Module(Module):
 
 
 class PAM_Module(Module):
-    """Position attention module"""
+    """Position attention module."""
 
     # Ref from SAGAN
 
     def __init__(self, in_dim):
-        super(PAM_Module, self).__init__()
+        super().__init__()
         self.chanel_in = in_dim
 
-        self.query_conv = Conv2d(
-            in_channels=in_dim, out_channels=in_dim // 8, kernel_size=1
-        )
-        self.key_conv = Conv2d(
-            in_channels=in_dim, out_channels=in_dim // 8, kernel_size=1
-        )
+        self.query_conv = Conv2d(in_channels=in_dim, out_channels=in_dim // 8, kernel_size=1)
+        self.key_conv = Conv2d(in_channels=in_dim, out_channels=in_dim // 8, kernel_size=1)
         self.value_conv = Conv2d(in_channels=in_dim, out_channels=in_dim, kernel_size=1)
         self.gamma = Parameter(torch.zeros(1))
 
         self.softmax = Softmax(dim=-1)
 
     def forward(self, x):
-        """
-        inputs :
-            x : input feature maps( B X C X H X W)
-        returns :
-            out : attention value + input feature
-            attention: B X (HxW) X (HxW)
+        """Inputs : x : input feature maps( B X C X H X W) returns : out : attention value + input feature attention: B
+        X (HxW) X (HxW).
         """
         m_batchsize, C, height, width = x.size()
-        proj_query = (
-            self.query_conv(x).view(m_batchsize, -1, width * height).permute(0, 2, 1)
-        )
+        proj_query = self.query_conv(x).view(m_batchsize, -1, width * height).permute(0, 2, 1)
         proj_key = self.key_conv(x).view(m_batchsize, -1, width * height)
         energy = torch.bmm(proj_query, proj_key)
         attention = self.softmax(energy)
@@ -225,22 +205,18 @@ class PAM_Module(Module):
 
 
 class CAM_Module(Module):
-    """Channel attention module"""
+    """Channel attention module."""
 
     def __init__(self, in_dim):
-        super(CAM_Module, self).__init__()
+        super().__init__()
         self.chanel_in = in_dim
 
         self.gamma = Parameter(torch.zeros(1))
         self.softmax = Softmax(dim=-1)
 
     def forward(self, x):
-        """
-        inputs :
-            x : input feature maps( B X C X H X W)
-        returns :
-            out : attention value + input feature
-            attention: B X C X C
+        """Inputs : x : input feature maps( B X C X H X W) returns : out : attention value + input feature attention: B
+        X C X C.
         """
         m_batchsize, C, height, width = x.size()
         proj_query = x.view(m_batchsize, C, -1)
@@ -259,14 +235,10 @@ class CAM_Module(Module):
 
 
 class Dual_Module(Module):
-    """
-    # Created by: CASIA IVA
-    # Email: jliu@nlpr.ia.ac.cn
-    # Copyright (c) 2018
+    """# Created by: CASIA IVA # Email: jliu@nlpr.ia.ac.cn # Copyright (c) 2018.
 
-    # Reference: Dual Attention Network for Scene Segmentation
-    # https://arxiv.org/pdf/1809.02983.pdf
-    # https://github.com/junfu1115/DANet/blob/master/encoding/nn/attention.py
+    # Reference: Dual Attention Network for Scene Segmentation # https://arxiv.org/pdf/1809.02983.pdf #
+    https://github.com/junfu1115/DANet/blob/master/encoding/nn/attention.py
     """
 
     def __init__(self, in_dim):

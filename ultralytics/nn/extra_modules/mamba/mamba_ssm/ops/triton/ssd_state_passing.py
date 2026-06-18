@@ -1,42 +1,59 @@
 # Copyright (c) 2024, Tri Dao, Albert Gu.
 
-"""We want triton==2.1.0 or 2.2.0 for this
-"""
+"""We want triton==2.1.0 or 2.2.0 for this."""
 
-import math
 import torch
 import torch.nn.functional as F
-
 import triton
 import triton.language as tl
-
-from einops import rearrange, repeat
+from einops import rearrange
 
 
 @triton.autotune(
     configs=[
-        triton.Config({'BLOCK_SIZE': 64}),
-        triton.Config({'BLOCK_SIZE': 128}),
-        triton.Config({'BLOCK_SIZE': 256}),
-        triton.Config({'BLOCK_SIZE': 512}),
-        triton.Config({'BLOCK_SIZE': 1024}),
-        triton.Config({'BLOCK_SIZE': 2048}),
+        triton.Config({"BLOCK_SIZE": 64}),
+        triton.Config({"BLOCK_SIZE": 128}),
+        triton.Config({"BLOCK_SIZE": 256}),
+        triton.Config({"BLOCK_SIZE": 512}),
+        triton.Config({"BLOCK_SIZE": 1024}),
+        triton.Config({"BLOCK_SIZE": 2048}),
     ],
-    key=['dim'],
+    key=["dim"],
 )
 @triton.jit
 def _state_passing_fwd_kernel(
     # Pointers to matrices
-    states_ptr, out_ptr, final_states_ptr, dA_cs_ptr, initstates_ptr, seq_idx_ptr,
+    states_ptr,
+    out_ptr,
+    final_states_ptr,
+    dA_cs_ptr,
+    initstates_ptr,
+    seq_idx_ptr,
     # Matrix dimensions
-    dim, nchunks, seqlen, chunk_size,
+    dim,
+    nchunks,
+    seqlen,
+    chunk_size,
     # Strides
-    stride_states_batch, stride_states_chunk, stride_states_head, stride_states_dim,
-    stride_out_batch, stride_out_chunk, stride_out_head, stride_out_dim,
-    stride_final_states_batch, stride_final_states_head, stride_final_states_dim,
-    stride_dA_cs_batch, stride_dA_cs_chunk, stride_dA_cs_head,
-    stride_initstates_batch, stride_initstates_head, stride_initstates_dim,
-    stride_seq_idx_batch, stride_seq_idx_seqlen,
+    stride_states_batch,
+    stride_states_chunk,
+    stride_states_head,
+    stride_states_dim,
+    stride_out_batch,
+    stride_out_chunk,
+    stride_out_head,
+    stride_out_dim,
+    stride_final_states_batch,
+    stride_final_states_head,
+    stride_final_states_dim,
+    stride_dA_cs_batch,
+    stride_dA_cs_chunk,
+    stride_dA_cs_head,
+    stride_initstates_batch,
+    stride_initstates_head,
+    stride_initstates_dim,
+    stride_seq_idx_batch,
+    stride_seq_idx_seqlen,
     # Meta-parameters
     HAS_INITSTATES: tl.constexpr,
     HAS_SEQ_IDX: tl.constexpr,
@@ -60,7 +77,7 @@ def _state_passing_fwd_kernel(
     final_states_ptrs = final_states_ptr + offs_m * stride_final_states_dim
 
     if not HAS_INITSTATES:
-        states = tl.zeros((BLOCK_SIZE, ), dtype=tl.float32)
+        states = tl.zeros((BLOCK_SIZE,), dtype=tl.float32)
     else:
         initstates_ptrs = initstates_ptr + offs_m * stride_initstates_dim
         states = tl.load(initstates_ptrs, mask=offs_m < dim, other=0.0).to(tl.float32)
@@ -87,31 +104,59 @@ def _state_passing_fwd_kernel(
 
 @triton.autotune(
     configs=[
-        triton.Config({'BLOCK_SIZE': 64}),
-        triton.Config({'BLOCK_SIZE': 128}),
-        triton.Config({'BLOCK_SIZE': 256}),
-        triton.Config({'BLOCK_SIZE': 512}),
-        triton.Config({'BLOCK_SIZE': 1024}),
-        triton.Config({'BLOCK_SIZE': 2048}),
+        triton.Config({"BLOCK_SIZE": 64}),
+        triton.Config({"BLOCK_SIZE": 128}),
+        triton.Config({"BLOCK_SIZE": 256}),
+        triton.Config({"BLOCK_SIZE": 512}),
+        triton.Config({"BLOCK_SIZE": 1024}),
+        triton.Config({"BLOCK_SIZE": 2048}),
     ],
-    key=['dim'],
+    key=["dim"],
 )
 @triton.jit
 def _state_passing_bwd_kernel(
     # Pointers to matrices
-    dout_ptr, out_ptr, dA_cs_ptr, dfinal_states_ptr, seq_idx_ptr,
-    dstates_ptr, ddA_cs_ptr, dinitstates_ptr, states_converted_ptr,
+    dout_ptr,
+    out_ptr,
+    dA_cs_ptr,
+    dfinal_states_ptr,
+    seq_idx_ptr,
+    dstates_ptr,
+    ddA_cs_ptr,
+    dinitstates_ptr,
+    states_converted_ptr,
     # Matrix dimensions
-    dim, nchunks, seqlen, chunk_size,
+    dim,
+    nchunks,
+    seqlen,
+    chunk_size,
     # Strides
-    stride_dout_batch, stride_dout_chunk, stride_dout_head, stride_dout_dim,
-    stride_out_batch, stride_out_chunk, stride_out_head, stride_out_dim,
-    stride_dA_cs_batch, stride_dA_cs_chunk, stride_dA_cs_head,
-    stride_dfinal_states_batch, stride_dfinal_states_head, stride_dfinal_states_dim,
-    stride_seq_idx_batch, stride_seq_idx_seqlen,
-    stride_dstates_batch, stride_dstates_chunk, stride_dstates_head, stride_dstates_dim,
-    stride_ddA_cs_batch, stride_ddA_cs_chunk, stride_ddA_cs_head,
-    stride_dinitstates_batch, stride_dinitstates_head, stride_dinitstates_dim,
+    stride_dout_batch,
+    stride_dout_chunk,
+    stride_dout_head,
+    stride_dout_dim,
+    stride_out_batch,
+    stride_out_chunk,
+    stride_out_head,
+    stride_out_dim,
+    stride_dA_cs_batch,
+    stride_dA_cs_chunk,
+    stride_dA_cs_head,
+    stride_dfinal_states_batch,
+    stride_dfinal_states_head,
+    stride_dfinal_states_dim,
+    stride_seq_idx_batch,
+    stride_seq_idx_seqlen,
+    stride_dstates_batch,
+    stride_dstates_chunk,
+    stride_dstates_head,
+    stride_dstates_dim,
+    stride_ddA_cs_batch,
+    stride_ddA_cs_chunk,
+    stride_ddA_cs_head,
+    stride_dinitstates_batch,
+    stride_dinitstates_head,
+    stride_dinitstates_dim,
     # Meta-parameters
     CONVERT_STATES: tl.constexpr,
     HAS_DFINAL_STATES: tl.constexpr,
@@ -144,9 +189,11 @@ def _state_passing_bwd_kernel(
         states_converted_ptrs = states_converted_ptr + offs_m * stride_out_dim
 
     if HAS_DFINAL_STATES:
-        dstates = tl.load(dfinal_states_ptr + offs_m * stride_dfinal_states_dim, mask=offs_m < dim, other=0.0).to(tl.float32)
+        dstates = tl.load(dfinal_states_ptr + offs_m * stride_dfinal_states_dim, mask=offs_m < dim, other=0.0).to(
+            tl.float32
+        )
     else:
-        dstates = tl.zeros((BLOCK_SIZE, ), dtype=tl.float32)
+        dstates = tl.zeros((BLOCK_SIZE,), dtype=tl.float32)
     tl.store(dstates_ptrs, dstates, mask=offs_m < dim)
     if HAS_SEQ_IDX:
         seq_idx = tl.load(seq_idx_ptr + (seqlen - 1) * stride_seq_idx_seqlen)
@@ -163,8 +210,8 @@ def _state_passing_bwd_kernel(
             tl.store(states_converted_ptrs, out, mask=offs_m < dim)
         ddA = tl.sum(out * dstates) * scale
         tl.store(ddA_cs_ptr, ddA)
-        dout = tl.load(dout_ptrs, mask=offs_m < dim, other=0.0).to(tl.float32)
-        dstates = scale * dstates + dout
+        doubt = tl.load(dout_ptrs, mask=offs_m < dim, other=0.0).to(tl.float32)
+        dstates = scale * dstates + doubt
         tl.store(dstates_ptrs, dstates, mask=offs_m < dim)
         dout_ptrs -= stride_dout_chunk
         dstates_ptrs -= stride_dstates_chunk
@@ -186,13 +233,12 @@ def _state_passing_bwd_kernel(
         out = tl.load(out_ptrs, mask=offs_m < dim, other=0.0).to(tl.float32)
         ddA = tl.sum(out * dstates) * scale
         tl.store(ddA_cs_ptr, ddA)
-        dout = tl.load(dout_ptrs, mask=offs_m < dim, other=0.0).to(tl.float32)
-        dstates = scale * dstates + dout
+        doubt = tl.load(dout_ptrs, mask=offs_m < dim, other=0.0).to(tl.float32)
+        dstates = scale * dstates + doubt
         tl.store(dinitstates_ptr + offs_m * stride_dinitstates_dim, dstates, mask=offs_m < dim)
 
 
-def _state_passing_fwd(states, dA_chunk_cumsum, initial_states=None, seq_idx=None, chunk_size=None,
-                       out_dtype=None):
+def _state_passing_fwd(states, dA_chunk_cumsum, initial_states=None, seq_idx=None, chunk_size=None, out_dtype=None):
     batch, nchunks, nheads, dim = states.shape
     assert dA_chunk_cumsum.shape == (batch, nheads, nchunks)
     if initial_states is not None:
@@ -204,17 +250,41 @@ def _state_passing_fwd(states, dA_chunk_cumsum, initial_states=None, seq_idx=Non
     out_dtype = states.dtype if out_dtype is None else out_dtype
     out = torch.empty((batch, nchunks, nheads, dim), device=states.device, dtype=out_dtype)
     final_states = torch.empty((batch, nheads, dim), device=states.device, dtype=torch.float32)
-    grid = lambda META: (triton.cdiv(dim, META['BLOCK_SIZE']), batch, nheads)
+
+    def grid(META):
+        return (triton.cdiv(dim, META["BLOCK_SIZE"]), batch, nheads)
+
     with torch.cuda.device(states.device.index):
         _state_passing_fwd_kernel[grid](
-            states, out, final_states, dA_chunk_cumsum, initial_states, seq_idx,
-            dim, nchunks, seqlen if seq_idx is not None else 0, chunk_size if seq_idx is not None else 0,
-            states.stride(0), states.stride(1), states.stride(2), states.stride(3),
-            out.stride(0), out.stride(1), out.stride(2), out.stride(3),
-            final_states.stride(0), final_states.stride(1), final_states.stride(2),
-            dA_chunk_cumsum.stride(0), dA_chunk_cumsum.stride(2), dA_chunk_cumsum.stride(1),
-            *((initial_states.stride(0), initial_states.stride(1), initial_states.stride(2))
-              if initial_states is not None else (0, 0, 0)),
+            states,
+            out,
+            final_states,
+            dA_chunk_cumsum,
+            initial_states,
+            seq_idx,
+            dim,
+            nchunks,
+            seqlen if seq_idx is not None else 0,
+            chunk_size if seq_idx is not None else 0,
+            states.stride(0),
+            states.stride(1),
+            states.stride(2),
+            states.stride(3),
+            out.stride(0),
+            out.stride(1),
+            out.stride(2),
+            out.stride(3),
+            final_states.stride(0),
+            final_states.stride(1),
+            final_states.stride(2),
+            dA_chunk_cumsum.stride(0),
+            dA_chunk_cumsum.stride(2),
+            dA_chunk_cumsum.stride(1),
+            *(
+                (initial_states.stride(0), initial_states.stride(1), initial_states.stride(2))
+                if initial_states is not None
+                else (0, 0, 0)
+            ),
             *((seq_idx.stride(0), seq_idx.stride(1)) if seq_idx is not None else (0, 0)),
             HAS_INITSTATES=initial_states is not None,
             HAS_SEQ_IDX=seq_idx is not None,
@@ -223,22 +293,27 @@ def _state_passing_fwd(states, dA_chunk_cumsum, initial_states=None, seq_idx=Non
 
 
 def _state_passing_bwd(
-        states, dA_chunk_cumsum, dout, dfinal_states=None, seq_idx=None, has_initial_states=None,
-        dstates_dtype=None, states_dtype=None, chunk_size=None
+    states,
+    dA_chunk_cumsum,
+    doubt,
+    dfinal_states=None,
+    seq_idx=None,
+    has_initial_states=None,
+    dstates_dtype=None,
+    states_dtype=None,
+    chunk_size=None,
 ):
-    """
-    states contains the initial_states at index 0. The final states are not included in states.
-    """
+    """States contains the initial_states at index 0. The final states are not included in states."""
     batch, nchunks, nheads, dim = states.shape
     assert dA_chunk_cumsum.shape == (batch, nheads, nchunks)
-    assert dout.shape == (batch, nchunks, nheads, dim)
+    assert doubt.shape == (batch, nchunks, nheads, dim)
     if seq_idx is not None:
         assert chunk_size is not None
         seqlen = seq_idx.shape[-1]
         assert seq_idx.shape == (batch, seqlen)
-    dstates = torch.empty_like(dout, dtype=dstates_dtype if dstates_dtype is not None else dout.dtype)
+    dstates = torch.empty_like(doubt, dtype=dstates_dtype if dstates_dtype is not None else doubt.dtype)
     if states_dtype is not None and states_dtype != states.dtype:
-        states_converted = torch.empty_like(states, dtype=dstates_dtype if dstates_dtype is not None else dout.dtype)
+        states_converted = torch.empty_like(states, dtype=dstates_dtype if dstates_dtype is not None else doubt.dtype)
         assert states_converted.stride() == states.stride()
     else:
         states_converted = None
@@ -250,24 +325,55 @@ def _state_passing_bwd(
         assert dfinal_states.shape == (batch, nheads, dim)
     BLOCK_SIZE_min = 64
     n_blocks = (dim + BLOCK_SIZE_min - 1) // BLOCK_SIZE_min
-    ddA_chunk_cumsum = torch.empty(batch, nheads, nchunks, n_blocks,
-                                    dtype=torch.float32, device=dA_chunk_cumsum.device)
-    grid = lambda META: (triton.cdiv(dim, META['BLOCK_SIZE']), batch, nheads)
-    with torch.cuda.device(dout.device.index):
+    ddA_chunk_cumsum = torch.empty(batch, nheads, nchunks, n_blocks, dtype=torch.float32, device=dA_chunk_cumsum.device)
+
+    def grid(META):
+        return (triton.cdiv(dim, META["BLOCK_SIZE"]), batch, nheads)
+
+    with torch.cuda.device(doubt.device.index):
         _state_passing_bwd_kernel[grid](
-            dout, states, dA_chunk_cumsum, dfinal_states, seq_idx,
-            dstates, ddA_chunk_cumsum, dinitstates, states_converted,
-            dim, nchunks, seqlen if seq_idx is not None else 0, chunk_size if seq_idx is not None else 0,
-            dout.stride(0), dout.stride(1), dout.stride(2), dout.stride(3),
-            states.stride(0), states.stride(1), states.stride(2), states.stride(3),
-            dA_chunk_cumsum.stride(0), dA_chunk_cumsum.stride(2), dA_chunk_cumsum.stride(1),
-            *((dfinal_states.stride(0), dfinal_states.stride(1), dfinal_states.stride(2))
-                if dfinal_states is not None else (0, 0, 0)),
+            doubt,
+            states,
+            dA_chunk_cumsum,
+            dfinal_states,
+            seq_idx,
+            dstates,
+            ddA_chunk_cumsum,
+            dinitstates,
+            states_converted,
+            dim,
+            nchunks,
+            seqlen if seq_idx is not None else 0,
+            chunk_size if seq_idx is not None else 0,
+            doubt.stride(0),
+            doubt.stride(1),
+            doubt.stride(2),
+            doubt.stride(3),
+            states.stride(0),
+            states.stride(1),
+            states.stride(2),
+            states.stride(3),
+            dA_chunk_cumsum.stride(0),
+            dA_chunk_cumsum.stride(2),
+            dA_chunk_cumsum.stride(1),
+            *(
+                (dfinal_states.stride(0), dfinal_states.stride(1), dfinal_states.stride(2))
+                if dfinal_states is not None
+                else (0, 0, 0)
+            ),
             *((seq_idx.stride(0), seq_idx.stride(1)) if seq_idx is not None else (0, 0)),
-            dstates.stride(0), dstates.stride(1), dstates.stride(2), dstates.stride(3),
-            ddA_chunk_cumsum.stride(0), ddA_chunk_cumsum.stride(2), ddA_chunk_cumsum.stride(1),
-            *((dinitstates.stride(0), dinitstates.stride(1), dinitstates.stride(2))
-              if dinitstates is not None else (0, 0, 0)),
+            dstates.stride(0),
+            dstates.stride(1),
+            dstates.stride(2),
+            dstates.stride(3),
+            ddA_chunk_cumsum.stride(0),
+            ddA_chunk_cumsum.stride(2),
+            ddA_chunk_cumsum.stride(1),
+            *(
+                (dinitstates.stride(0), dinitstates.stride(1), dinitstates.stride(2))
+                if dinitstates is not None
+                else (0, 0, 0)
+            ),
             CONVERT_STATES=states_converted is not None,
             HAS_DFINAL_STATES=dfinal_states is not None,
             HAS_DINITSTATES=dinitstates is not None,
@@ -278,14 +384,17 @@ def _state_passing_bwd(
     ddA_chunk_cumsum = ddA_chunk_cumsum[..., :n_valid_blocks].sum(dim=-1).to(dtype=dA_chunk_cumsum.dtype)
     if states_dtype is not None and states_dtype == states.dtype:
         states_converted = states
-    return (dstates, ddA_chunk_cumsum, dinitstates) if states_dtype is None else (dstates, ddA_chunk_cumsum, dinitstates, states_converted)
+    return (
+        (dstates, ddA_chunk_cumsum, dinitstates)
+        if states_dtype is None
+        else (dstates, ddA_chunk_cumsum, dinitstates, states_converted)
+    )
 
 
 class StatePassingFn(torch.autograd.Function):
-
     @staticmethod
     def forward(ctx, states, dA_chunk_cumsum, initial_states=None):
-        batch, nchunks, nheads, dim = states.shape
+        batch, nchunks, nheads, _dim = states.shape
         assert dA_chunk_cumsum.shape == (batch, nheads, nchunks)
         if states.stride(-1) != 1:
             states = states.contiguous()
@@ -295,42 +404,38 @@ class StatePassingFn(torch.autograd.Function):
         return out, final_states
 
     @staticmethod
-    def backward(ctx, dout, dfinal_states):
+    def backward(ctx, doubt, dfinal_states):
         out, dA_chunk_cumsum = ctx.saved_tensors
         batch, nchunks, nheads, dim = out.shape
-        assert dout.shape == (batch, nchunks, nheads, dim)
+        assert doubt.shape == (batch, nchunks, nheads, dim)
         assert dA_chunk_cumsum.shape == (batch, nheads, nchunks)
         assert dfinal_states.shape == (batch, nheads, dim)
-        if dout.stride(-1) != 1:
-            dout = dout.contiguous()
+        if doubt.stride(-1) != 1:
+            doubt = doubt.contiguous()
         dstates, ddA_chunk_cumsum, dinitstates = _state_passing_bwd(
-            out, dA_chunk_cumsum, dout, dfinal_states=dfinal_states , has_initial_states=ctx.has_initial_states
+            out, dA_chunk_cumsum, doubt, dfinal_states=dfinal_states, has_initial_states=ctx.has_initial_states
         )
         return dstates, ddA_chunk_cumsum, dinitstates
 
 
 def state_passing(states, dA_chunk_cumsum, initial_states=None):
-    """
-    Argument:
-        states: (batch, nchunks, nheads, dim)
-        dA_chunk_cumsum: (batch, nheads, nchunks)
-        initial_states: (batch, nheads, dim)
-    Return:
+    """Argument: states: (batch, nchunks, nheads, dim) dA_chunk_cumsum: (batch, nheads, nchunks) initial_states: (batch,
+    nheads, dim).
+
+    Returns:
         out: (batch, nchunks, nheads, dim)
-        final_states: (batch, nheads, dim)
+        final_states: (batch, nheads, dim).
     """
     return StatePassingFn.apply(states, dA_chunk_cumsum, initial_states)
 
 
 def state_passing_ref(states, dA_chunk_cumsum, initial_states=None):
-    """
-    Argument:
-        states: (batch, nchunks, nheads, dim)
-        dA_chunk_cumsum: (batch, nheads, nchunks)
-        initial_states: (batch, nheads, dim)
-    Return:
+    """Argument: states: (batch, nchunks, nheads, dim) dA_chunk_cumsum: (batch, nheads, nchunks) initial_states: (batch,
+    nheads, dim).
+
+    Returns:
         out: (batch, nchunks, nheads, dim)
-        final_states: (batch, nheads, dim)
+        final_states: (batch, nheads, dim).
     """
     if initial_states is None:
         initial_states = torch.zeros_like(states[:, 0])

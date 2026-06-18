@@ -26,18 +26,14 @@ def k_previous_obs(observations, cur_age, k):
 
 
 def convert_x_to_bbox(x, score=None):
-    """
-    Takes a bounding box in the centre form [x,y,s,r] and returns it in the form
-      [x1,y1,x2,y2] where x1,y1 is the top left and x2,y2 is the bottom right
+    """Takes a bounding box in the center form [x,y,s,r] and returns it in the form [x1,y1,x2,y2] where x1,y1 is the top
+    left and x2,y2 is the bottom right.
     """
     w = np.sqrt(x[2] * x[3])
     h = x[2] / w
     if score is None:
-        return np.array([x[0] - w / 2.0, x[1] - h / 2.0,
-                         x[0] + w / 2.0, x[1] + h / 2.0]).reshape((1, 4))
-    return np.array([x[0] - w / 2.0, x[1] - h / 2.0,
-                     x[0] + w / 2.0, x[1] + h / 2.0, score]
-        ).reshape((1, 5))
+        return np.array([x[0] - w / 2.0, x[1] - h / 2.0, x[0] + w / 2.0, x[1] + h / 2.0]).reshape((1, 4))
+    return np.array([x[0] - w / 2.0, x[1] - h / 2.0, x[0] + w / 2.0, x[1] + h / 2.0, score]).reshape((1, 5))
 
 
 def speed_direction(bbox1, bbox2):
@@ -49,9 +45,7 @@ def speed_direction(bbox1, bbox2):
 
 
 class KalmanBoxTracker:
-    """
-    This class represents the internal state of individual tracked objects observed as bbox.
-    """
+    """This class represents the internal state of individual tracked objects observed as bbox."""
 
     count = 0
 
@@ -65,10 +59,7 @@ class KalmanBoxTracker:
         Q_xy_scaling=0.01,
         Q_s_scaling=0.0001,
     ):
-        """
-        Initialises a tracker using initial bounding box.
-
-        """
+        """Initializes a tracker using initial bounding box."""
         # define constant velocity model
         self.max_obs = max_obs
         bbox = det[0:5]
@@ -101,9 +92,7 @@ class KalmanBoxTracker:
             ]
         )
         self.kf.R[2:, 2:] *= 10.0
-        self.kf.P[
-            4:, 4:
-        ] *= 1000.0  # give high uncertainty to the unobservable initial velocities
+        self.kf.P[4:, 4:] *= 1000.0  # give high uncertainty to the unobservable initial velocities
         self.kf.P *= 10.0
         self.kf.Q[4:6, 4:6] *= self.Q_xy_scaling
         self.kf.Q[-1, -1] *= self.Q_s_scaling
@@ -116,7 +105,7 @@ class KalmanBoxTracker:
         self.time_since_update = 0
         self.id = KalmanBoxTracker.count
         KalmanBoxTracker.count += 1
-        self.history = deque([], maxlen=self.max_obs)
+        self.history = deque(maxlen=self.max_obs)
         self.hits = 0
         self.hit_streak = 0
         self.age = 0
@@ -129,22 +118,19 @@ class KalmanBoxTracker:
         # Used for OCR
         self.last_observation = np.array([-1, -1, -1, -1, -1])  # placeholder
         # Used to output track after min_hits reached
-        self.features = deque([], maxlen=self.max_obs)
+        self.features = deque(maxlen=self.max_obs)
         # Used for velocity
         self.observations = dict()
         self.velocity = None
         self.delta_t = delta_t
-        self.history_observations = deque([], maxlen=self.max_obs)
+        self.history_observations = deque(maxlen=self.max_obs)
 
         self.emb = emb
 
         self.frozen = False
 
     def update(self, det):
-        """
-        Updates the state vector with observed bbox.
-        """
-
+        """Updates the state vector with observed bbox."""
         if det is not None:
             bbox = det[0:5]
             self.conf = det[4]
@@ -206,9 +192,7 @@ class KalmanBoxTracker:
         self.kf.apply_affine_correction(m, t)
 
     def predict(self):
-        """
-        Advances the state vector and returns the predicted bounding box estimate.
-        """
+        """Advances the state vector and returns the predicted bounding box estimate."""
         # Don't allow negative bounding boxes
         if (self.kf.x[6] + self.kf.x[2]) <= 0:
             self.kf.x[6] *= 0.0
@@ -223,9 +207,7 @@ class KalmanBoxTracker:
         return self.history[-1]
 
     def get_state(self):
-        """
-        Returns the current bounding box estimate.
-        """
+        """Returns the current bounding box estimate."""
         return self.x_to_bbox_func(self.kf.x)
 
     def mahalanobis(self, bbox):
@@ -234,8 +216,7 @@ class KalmanBoxTracker:
 
 
 class DeepOcSort(BaseTracker):
-    """
-    Initialize the DeepOcSort tracker with various parameters.
+    """Initialize the DeepOcSort tracker with various parameters.
 
     Parameters:
     - reid_weights (Path): Path to the re-identification model weights.
@@ -250,7 +231,7 @@ class DeepOcSort(BaseTracker):
     - nr_classes (int): Total number of object classes that the tracker will handle (for per_class=True).
     - asso_func (str): Algorithm name used for data association between detections and tracks.
     - is_obb (bool): Work with Oriented Bounding Boxes (OBB) instead of standard axis-aligned bounding boxes.
-    
+
     DeepOcSort-specific parameters:
     - delta_t (int): Time window size for motion estimation.
     - inertia (float): Motion model weight, higher values favor motion consistency.
@@ -262,13 +243,13 @@ class DeepOcSort(BaseTracker):
     - aw_off (bool): Whether to disable adaptive weights for appearance/motion balance.
     - Q_xy_scaling (float): Scaling factor for process noise in position coordinates.
     - Q_s_scaling (float): Scaling factor for process noise in scale coordinates.
-    
+
     Attributes:
-    - frame_count (int): Counter for the frames processed.
-    - active_tracks (list): List to hold active tracks.
-    - model: ReID model for appearance feature extraction.
-    - cmc: Camera motion compensation object.
-    - kalman_filter: Kalman filter for motion estimation.
+        - frame_count (int): Counter for the frames processed.
+            - active_tracks (list): List to hold active tracks.
+            - model: ReID model for appearance feature extraction.
+            - cmc: Camera motion compensation object.
+            - kalman_filter: Kalman filter for motion estimation.
     """
 
     def __init__(
@@ -287,12 +268,12 @@ class DeepOcSort(BaseTracker):
         aw_off: bool = False,
         Q_xy_scaling: float = 0.01,
         Q_s_scaling: float = 0.0001,
-        **kwargs  # BaseTracker parameters
+        **kwargs,  # BaseTracker parameters
     ):
         # Capture all init params for logging
-        init_args = {k: v for k, v in locals().items() if k not in ('self', 'kwargs')}
-        super().__init__(**init_args, _tracker_name='DeepOcSort', **kwargs)
-        
+        init_args = {k: v for k, v in locals().items() if k not in ("self", "kwargs")}
+        super().__init__(**init_args, _tracker_name="DeepOcSort", **kwargs)
+
         """
         Sets key parameters for SORT
         """
@@ -305,26 +286,19 @@ class DeepOcSort(BaseTracker):
         self.Q_s_scaling = Q_s_scaling
         KalmanBoxTracker.count = 1
 
-        self.model = ReidAutoBackend(
-            weights=reid_weights, device=device, half=half
-        ).model
+        self.model = ReidAutoBackend(weights=reid_weights, device=device, half=half).model
         # "similarity transforms using feature point extraction, optical flow, and RANSAC"
         self.cmc = get_cmc_method("sof")()
         self.embedding_off = embedding_off
         self.cmc_off = cmc_off
         self.aw_off = aw_off
-        
+
     @BaseTracker.setup_decorator
     @BaseTracker.per_class_decorator
-    def update(
-        self, dets: np.ndarray, img: np.ndarray, embs: np.ndarray = None
-    ) -> np.ndarray:
-        """
-        Params:
-          dets - a numpy array of detections in the format [[x1,y1,x2,y2,score],[x1,y1,x2,y2,score],...]
-        Requires: this method must be called once for each frame even with empty detections
-        (use np.empty((0, 5)) for frames without detections).
-        Returns the a similar array, where the last column is the object ID.
+    def update(self, dets: np.ndarray, img: np.ndarray, embs: np.ndarray = None) -> np.ndarray:
+        """Params: dets - a numpy array of detections in the format [[x1,y1,x2,y2,score],[x1,y1,x2,y2,score],...]
+        Requires: this method must be called once for each frame even with empty detections (use np.empty((0,
+        5)) for frames without detections). Returns the a similar array, where the last column is the object ID.
         NOTE: The number of objects returned may differ from the number of detections provided.
         """
         # dets, s, c = dets.data
@@ -383,10 +357,12 @@ class DeepOcSort(BaseTracker):
             self.active_tracks.pop(t)
 
         velocities = np.array(
-            [trk.velocity if trk.velocity is not None else np.array((0, 0)) for trk in self.active_tracks])
+            [trk.velocity if trk.velocity is not None else np.array((0, 0)) for trk in self.active_tracks]
+        )
         last_boxes = np.array([trk.last_observation for trk in self.active_tracks])
         k_observations = np.array(
-            [k_previous_obs(trk.observations, trk.age, self.delta_t) for trk in self.active_tracks])
+            [k_previous_obs(trk.observations, trk.age, self.delta_t) for trk in self.active_tracks]
+        )
 
         """
             First round of association
@@ -444,22 +420,16 @@ class DeepOcSort(BaseTracker):
                     if iou_left[m[0], m[1]] < self.iou_threshold:
                         continue
                     self.active_tracks[trk_ind].update(dets[det_ind, :])
-                    self.active_tracks[trk_ind].update_emb(
-                        dets_embs[det_ind], alpha=dets_alpha[det_ind]
-                    )
+                    self.active_tracks[trk_ind].update_emb(dets_embs[det_ind], alpha=dets_alpha[det_ind])
                     to_remove_det_indices.append(det_ind)
                     to_remove_trk_indices.append(trk_ind)
-                unmatched_dets = np.setdiff1d(
-                    unmatched_dets, np.array(to_remove_det_indices)
-                )
-                unmatched_trks = np.setdiff1d(
-                    unmatched_trks, np.array(to_remove_trk_indices)
-                )
+                unmatched_dets = np.setdiff1d(unmatched_dets, np.array(to_remove_det_indices))
+                unmatched_trks = np.setdiff1d(unmatched_trks, np.array(to_remove_trk_indices))
 
         for m in unmatched_trks:
             self.active_tracks[m].update(None)
 
-        # create and initialise new trackers for unmatched detections
+        # create and initialize new trackers for unmatched detections
         for i in unmatched_dets:
             trk = KalmanBoxTracker(
                 dets[i],
@@ -481,15 +451,9 @@ class DeepOcSort(BaseTracker):
                 we didn't notice significant difference here
                 """
                 d = trk.last_observation[:4]
-            if (trk.time_since_update < 1) and (
-                trk.hit_streak >= self.min_hits or self.frame_count <= self.min_hits
-            ):
+            if (trk.time_since_update < 1) and (trk.hit_streak >= self.min_hits or self.frame_count <= self.min_hits):
                 # +1 as MOT benchmark requires positive
-                ret.append(
-                    np.concatenate(
-                        (d, [trk.id], [trk.conf], [trk.cls], [trk.det_ind])
-                    ).reshape(1, -1)
-                )
+                ret.append(np.concatenate((d, [trk.id], [trk.conf], [trk.cls], [trk.det_ind])).reshape(1, -1))
             i -= 1
             # remove dead tracklet
             if trk.time_since_update > self.max_age:
