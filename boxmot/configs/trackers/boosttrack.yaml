@@ -87,4 +87,3 @@ with_reid:
   type: choice
   default: True # True for BoostTrack+ and BoostTrack++
   options: [False, True]
-

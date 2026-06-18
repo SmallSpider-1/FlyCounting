@@ -1,15 +1,15 @@
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 import cv2
 import numpy as np
 import torch
 
 
-def resolve_image(image: Union[np.ndarray, str]) -> np.ndarray:
-    """
-    Resolves an image input to a numpy array (cv2 BGR format).
-    """
+def resolve_image(image: np.ndarray | str) -> np.ndarray:
+    """Resolves an image input to a numpy array (cv2 BGR format)."""
     if isinstance(image, str) or isinstance(image, Path):
         image_path = str(image)
         img = cv2.imread(image_path)
@@ -21,16 +21,16 @@ def resolve_image(image: Union[np.ndarray, str]) -> np.ndarray:
     else:
         raise ValueError(f"Unsupported image type: {type(image)}")
 
+
 def load_weights(path: str) -> Any:
-    """
-    Generic weight loader. By default uses torch.load
-    """
+    """Generic weight loader. By default uses torch.load."""
     if isinstance(path, str) and not Path(path).exists():
-         raise FileNotFoundError(f"Weights file not found: {path}")
-         
+        raise FileNotFoundError(f"Weights file not found: {path}")
+
     # This is a placeholder. Real models often need architecture init before loading weights.
     # But strictly following the user snippet:
-    return torch.load(path, map_location='cpu') 
+    return torch.load(path, map_location="cpu")
+
 
 class Detector:
     def __init__(self, path: str):
@@ -48,12 +48,12 @@ class Detector:
 
     def postprocess(self, boxes, **kwargs):
         raise NotImplementedError()
-        
-    def __call__(self, image: Union[np.ndarray, str], **kwargs):
+
+    def __call__(self, image: np.ndarray | str, **kwargs):
         image = resolve_image(image)
-        
+
         frame = self.preprocess(image, **kwargs)
         boxes = self.process(frame, **kwargs)
         boxes = self.postprocess(boxes, **kwargs)
-        
+
         return boxes
