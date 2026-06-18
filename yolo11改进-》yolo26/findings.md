@@ -1,6 +1,7 @@
 # Findings & Decisions
 
 ## Requirements
+
 - Use the conda environment requested as `yolo26`; local environment discovery found `yolov26`.
 - Train the improved YOLO26 model configs migrated from `/home/admin1/Projects/ultralytics-yolo11-main/ultralytics/cfg/models/11`.
 - Use `/home/admin1/Projects/ultralytics-main/train.py` for training.
@@ -8,6 +9,7 @@
 - Use `planning-with-files` to plan and track the experiment.
 
 ## Research Findings
+
 - `/home/admin1/Projects/ultralytics-main/ultralytics/cfg/models/26` contains 411 yaml files.
 - The source directory `/home/admin1/Projects/ultralytics-yolo11-main/ultralytics/cfg/models/11` contains 408 `yolo11-*.yaml` files.
 - Mapping target names by replacing `yolo26-` with `yolo11-` shows 0 extra and 0 missing files for the migrated `yolo26-*.yaml` set.
@@ -20,23 +22,26 @@
 - Final active shard layout uses 8 processes: 4 on GPU0 and 4 on GPU1, 51 models per process.
 
 ## Technical Decisions
-| Decision | Rationale |
-|----------|-----------|
-| Run the exact migrated set of 408 configs | This matches the user's wording and avoids unrelated configs in the target directory. |
-| Use CLI arguments in `train.py` | Enables one command to run all migrated models while still using the requested script. |
-| Preserve existing defaults | Existing open tabs show prior single-model runs; keeping default behavior avoids breaking the user's current workflow. |
+
+| Decision                                  | Rationale                                                                                                              |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Run the exact migrated set of 408 configs | This matches the user's wording and avoids unrelated configs in the target directory.                                  |
+| Use CLI arguments in `train.py`           | Enables one command to run all migrated models while still using the requested script.                                 |
+| Preserve existing defaults                | Existing open tabs show prior single-model runs; keeping default behavior avoids breaking the user's current workflow. |
 
 ## Issues Encountered
-| Issue | Resolution |
-|-------|------------|
-| Requested conda env `yolo26` does not exist | Use local env `yolov26`, which is present and semantically matches the request. |
-| The full sweep is very large at 408 models x 200 epochs | Prepare resumable batch execution and per-model logs. |
-| `nohup conda run -n yolov26 ...` exited immediately with no output | Use `/home/admin1/.conda/envs/yolov26/bin/python` directly with `setsid` for the background sweep. |
-| Single GPU utilization is modest because each run uses small models and batch=4 | Run another independent training process on GPU1 using the non-overlapping second half of the model list. |
-| Ultralytics LOGGER can keep a closed tee stream between models in a multi-model Python process | Updated `train.py` to restore LOGGER stream state and make `Tee.write/flush` tolerate closed log files. |
-| Old attempts made active directories confusing | Moved non-current artifacts into `runs/detect/_old_noncurrent_20260513_114959`; current active locations now retain final shard outputs and current model logs/result dirs only. |
+
+| Issue                                                                                          | Resolution                                                                                                                                                                       |
+| ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Requested conda env `yolo26` does not exist                                                    | Use local env `yolov26`, which is present and semantically matches the request.                                                                                                  |
+| The full sweep is very large at 408 models x 200 epochs                                        | Prepare resumable batch execution and per-model logs.                                                                                                                            |
+| `nohup conda run -n yolov26 ...` exited immediately with no output                             | Use `/home/admin1/.conda/envs/yolov26/bin/python` directly with `setsid` for the background sweep.                                                                               |
+| Single GPU utilization is modest because each run uses small models and batch=4                | Run another independent training process on GPU1 using the non-overlapping second half of the model list.                                                                        |
+| Ultralytics LOGGER can keep a closed tee stream between models in a multi-model Python process | Updated `train.py` to restore LOGGER stream state and make `Tee.write/flush` tolerate closed log files.                                                                          |
+| Old attempts made active directories confusing                                                 | Moved non-current artifacts into `runs/detect/_old_noncurrent_20260513_114959`; current active locations now retain final shard outputs and current model logs/result dirs only. |
 
 ## Resources
+
 - Training script: `/home/admin1/Projects/ultralytics-main/train.py`
 - Target model directory: `/home/admin1/Projects/ultralytics-main/ultralytics/cfg/models/26`
 - Source model directory: `/home/admin1/Projects/ultralytics-yolo11-main/ultralytics/cfg/models/11`
@@ -46,4 +51,5 @@
 - Cleanup archive: `/home/admin1/Projects/ultralytics-main/runs/detect/_old_noncurrent_20260513_114959`
 
 ## Visual/Browser Findings
+
 - No browser or image sources used.

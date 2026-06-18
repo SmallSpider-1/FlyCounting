@@ -30,10 +30,7 @@ def parse_device(device):
 
 
 def assert_cuda_available(device):
-    if not (
-        torch.cuda.is_available()
-        and torch.cuda.device_count() >= len(device.replace(",", ""))
-    ):
+    if not (torch.cuda.is_available() and torch.cuda.device_count() >= len(device.replace(",", ""))):
         install = (
             "See https://pytorch.org/get-started/locally/ for up-to-date torch install instructions if no CUDA devices are seen by torch.\n"
             if torch.cuda.device_count() == 0
@@ -51,7 +48,7 @@ def select_device(device="", batch=0):
     s = get_system_info()
     device = parse_device(device)
     mps = device == "mps"
-    cpu = device == "cpu" or device == "" and not torch.cuda.is_available()
+    cpu = device == "cpu" or (device == "" and not torch.cuda.is_available())
 
     if cpu or mps:
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"

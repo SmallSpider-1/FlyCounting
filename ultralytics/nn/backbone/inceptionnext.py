@@ -1,47 +1,59 @@
 """
 InceptionNeXt implementation, paper: https://arxiv.org/abs/2303.16900
-Some code is borrowed from timm: https://github.com/huggingface/pytorch-image-models
+Some code is borrowed from timm: https://github.com/huggingface/pytorch-image-models.
 """
 
 from functools import partial
 
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
-
 from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
+from timm.layers import DropPath, to_2tuple, trunc_normal_
 from timm.models import checkpoint_seq
-from timm.layers import trunc_normal_, DropPath, to_2tuple
 
-__all__ = ['inceptionnext_tiny', 'inceptionnext_small', 'inceptionnext_base', 'inceptionnext_base_384']
+__all__ = ["inceptionnext_base", "inceptionnext_base_384", "inceptionnext_small", "inceptionnext_tiny"]
+
 
 class InceptionDWConv2d(nn.Module):
-    """ Inception depthweise convolution
-    """
+    """Inception depthweise convolution."""
+
     def __init__(self, in_channels, square_kernel_size=3, band_kernel_size=11, branch_ratio=0.125):
         super().__init__()
-        
-        gc = int(in_channels * branch_ratio) # channel numbers of a convolution branch
-        self.dwconv_hw = nn.Conv2d(gc, gc, square_kernel_size, padding=square_kernel_size//2, groups=gc)
-        self.dwconv_w = nn.Conv2d(gc, gc, kernel_size=(1, band_kernel_size), padding=(0, band_kernel_size//2), groups=gc)
-        self.dwconv_h = nn.Conv2d(gc, gc, kernel_size=(band_kernel_size, 1), padding=(band_kernel_size//2, 0), groups=gc)
+
+        gc = int(in_channels * branch_ratio)  # channel numbers of a convolution branch
+        self.dwconv_hw = nn.Conv2d(gc, gc, square_kernel_size, padding=square_kernel_size // 2, groups=gc)
+        self.dwconv_w = nn.Conv2d(
+            gc, gc, kernel_size=(1, band_kernel_size), padding=(0, band_kernel_size // 2), groups=gc
+        )
+        self.dwconv_h = nn.Conv2d(
+            gc, gc, kernel_size=(band_kernel_size, 1), padding=(band_kernel_size // 2, 0), groups=gc
+        )
         self.split_indexes = (in_channels - 3 * gc, gc, gc, gc)
-        
+
     def forward(self, x):
         x_id, x_hw, x_w, x_h = torch.split(x, self.split_indexes, dim=1)
         return torch.cat(
-            (x_id, self.dwconv_hw(x_hw), self.dwconv_w(x_w), self.dwconv_h(x_h)), 
+            (x_id, self.dwconv_hw(x_hw), self.dwconv_w(x_w), self.dwconv_h(x_h)),
             dim=1,
         )
 
 
 class ConvMlp(nn.Module):
-    """ MLP using 1x1 convs that keeps spatial dims
-    copied from timm: https://github.com/huggingface/pytorch-image-models/blob/v0.6.11/timm/models/layers/mlp.py
+    """MLP using 1x1 convs that keeps spatial dims copied from timm:
+    https://github.com/huggingface/pytorch-image-models/blob/v0.6.11/timm/models/layers/mlp.py.
     """
+
     def __init__(
-            self, in_features, hidden_features=None, out_features=None, act_layer=nn.ReLU,
-            norm_layer=None, bias=True, drop=0.):
+        self,
+        in_features,
+        hidden_features=None,
+        out_features=None,
+        act_layer=nn.ReLU,
+        norm_layer=None,
+        bias=True,
+        drop=0.0,
+    ):
         super().__init__()
         out_features = out_features or in_features
         hidden_features = hidden_features or in_features
@@ -63,10 +75,18 @@ class ConvMlp(nn.Module):
 
 
 class MlpHead(nn.Module):
-    """ MLP classification head
-    """
-    def __init__(self, dim, num_classes=1000, mlp_ratio=3, act_layer=nn.GELU,
-        norm_layer=partial(nn.LayerNorm, eps=1e-6), drop=0., bias=True):
+    """MLP classification head."""
+
+    def __init__(
+        self,
+        dim,
+        num_classes=1000,
+        mlp_ratio=3,
+        act_layer=nn.GELU,
+        norm_layer=partial(nn.LayerNorm, eps=1e-6),
+        drop=0.0,
+        bias=True,
+    ):
         super().__init__()
         hidden_features = int(mlp_ratio * dim)
         self.fc1 = nn.Linear(dim, hidden_features, bias=bias)
@@ -76,7 +96,7 @@ class MlpHead(nn.Module):
         self.drop = nn.Dropout(drop)
 
     def forward(self, x):
-        x = x.mean((2, 3)) # global average pooling
+        x = x.mean((2, 3))  # global average pooling
         x = self.fc1(x)
         x = self.act(x)
         x = self.norm(x)
@@ -86,7 +106,8 @@ class MlpHead(nn.Module):
 
 
 class MetaNeXtBlock(nn.Module):
-    """ MetaNeXtBlock Block
+    """MetaNeXtBlock Block.
+
     Args:
         dim (int): Number of input channels.
         drop_path (float): Stochastic depth rate. Default: 0.0
@@ -94,23 +115,22 @@ class MetaNeXtBlock(nn.Module):
     """
 
     def __init__(
-            self,
-            dim,
-            token_mixer=InceptionDWConv2d,
-            norm_layer=nn.BatchNorm2d,
-            mlp_layer=ConvMlp,
-            mlp_ratio=4,
-            act_layer=nn.GELU,
-            ls_init_value=1e-6,
-            drop_path=0.,
-            
+        self,
+        dim,
+        token_mixer=InceptionDWConv2d,
+        norm_layer=nn.BatchNorm2d,
+        mlp_layer=ConvMlp,
+        mlp_ratio=4,
+        act_layer=nn.GELU,
+        ls_init_value=1e-6,
+        drop_path=0.0,
     ):
         super().__init__()
         self.token_mixer = token_mixer(dim)
         self.norm = norm_layer(dim)
         self.mlp = mlp_layer(dim, int(mlp_ratio * dim), act_layer=act_layer)
         self.gamma = nn.Parameter(ls_init_value * torch.ones(dim)) if ls_init_value else None
-        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+        self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
 
     def forward(self, x):
         shortcut = x
@@ -125,16 +145,16 @@ class MetaNeXtBlock(nn.Module):
 
 class MetaNeXtStage(nn.Module):
     def __init__(
-            self,
-            in_chs,
-            out_chs,
-            ds_stride=2,
-            depth=2,
-            drop_path_rates=None,
-            ls_init_value=1.0,
-            act_layer=nn.GELU,
-            norm_layer=None,
-            mlp_ratio=4,
+        self,
+        in_chs,
+        out_chs,
+        ds_stride=2,
+        depth=2,
+        drop_path_rates=None,
+        ls_init_value=1.0,
+        act_layer=nn.GELU,
+        norm_layer=None,
+        mlp_ratio=4,
     ):
         super().__init__()
         self.grad_checkpointing = False
@@ -146,17 +166,19 @@ class MetaNeXtStage(nn.Module):
         else:
             self.downsample = nn.Identity()
 
-        drop_path_rates = drop_path_rates or [0.] * depth
+        drop_path_rates = drop_path_rates or [0.0] * depth
         stage_blocks = []
         for i in range(depth):
-            stage_blocks.append(MetaNeXtBlock(
-                dim=out_chs,
-                drop_path=drop_path_rates[i],
-                ls_init_value=ls_init_value,
-                act_layer=act_layer,
-                norm_layer=norm_layer,
-                mlp_ratio=mlp_ratio,
-            ))
+            stage_blocks.append(
+                MetaNeXtBlock(
+                    dim=out_chs,
+                    drop_path=drop_path_rates[i],
+                    ls_init_value=ls_init_value,
+                    act_layer=act_layer,
+                    norm_layer=norm_layer,
+                    mlp_ratio=mlp_ratio,
+                )
+            )
             in_chs = out_chs
         self.blocks = nn.Sequential(*stage_blocks)
 
@@ -170,8 +192,9 @@ class MetaNeXtStage(nn.Module):
 
 
 class MetaNeXt(nn.Module):
-    r""" MetaNeXt
-        A PyTorch impl of : `InceptionNeXt: When Inception Meets ConvNeXt`  - https://arxiv.org/pdf/2203.xxxxx.pdf
+    r"""MetaNeXt A PyTorch impl of : `InceptionNeXt: When Inception Meets ConvNeXt` -
+    https://arxiv.org/pdf/2203.xxxxx.pdf.
+
     Args:
         in_chans (int): Number of input image channels. Default: 3
         num_classes (int): Number of classes for classification head. Default: 1000
@@ -188,20 +211,20 @@ class MetaNeXt(nn.Module):
     """
 
     def __init__(
-            self,
-            in_chans=3,
-            num_classes=1000,
-            depths=(3, 3, 9, 3),
-            dims=(96, 192, 384, 768),
-            token_mixers=nn.Identity,
-            norm_layer=nn.BatchNorm2d,
-            act_layer=nn.GELU,
-            mlp_ratios=(4, 4, 4, 3),
-            head_fn=MlpHead,
-            drop_rate=0.,
-            drop_path_rate=0.,
-            ls_init_value=1e-6,
-            **kwargs,
+        self,
+        in_chans=3,
+        num_classes=1000,
+        depths=(3, 3, 9, 3),
+        dims=(96, 192, 384, 768),
+        token_mixers=nn.Identity,
+        norm_layer=nn.BatchNorm2d,
+        act_layer=nn.GELU,
+        mlp_ratios=(4, 4, 4, 3),
+        head_fn=MlpHead,
+        drop_rate=0.0,
+        drop_path_rate=0.0,
+        ls_init_value=1e-6,
+        **kwargs,
     ):
         super().__init__()
 
@@ -211,13 +234,9 @@ class MetaNeXt(nn.Module):
         if not isinstance(mlp_ratios, (list, tuple)):
             mlp_ratios = [mlp_ratios] * num_stage
 
-
         self.num_classes = num_classes
         self.drop_rate = drop_rate
-        self.stem = nn.Sequential(
-            nn.Conv2d(in_chans, dims[0], kernel_size=4, stride=4),
-            norm_layer(dims[0])
-        )
+        self.stem = nn.Sequential(nn.Conv2d(in_chans, dims[0], kernel_size=4, stride=4), norm_layer(dims[0]))
 
         self.stages = nn.Sequential()
         dp_rates = [x.tolist() for x in torch.linspace(0, drop_path_rate, sum(depths)).split(depths)]
@@ -226,17 +245,19 @@ class MetaNeXt(nn.Module):
         # feature resolution stages, each consisting of multiple residual blocks
         for i in range(num_stage):
             out_chs = dims[i]
-            stages.append(MetaNeXtStage(
-                prev_chs,
-                out_chs,
-                ds_stride=2 if i > 0 else 1, 
-                depth=depths[i],
-                drop_path_rates=dp_rates[i],
-                ls_init_value=ls_init_value,
-                act_layer=act_layer,
-                norm_layer=norm_layer,
-                mlp_ratio=mlp_ratios[i],
-            ))
+            stages.append(
+                MetaNeXtStage(
+                    prev_chs,
+                    out_chs,
+                    ds_stride=2 if i > 0 else 1,
+                    depth=depths[i],
+                    drop_path_rates=dp_rates[i],
+                    ls_init_value=ls_init_value,
+                    act_layer=act_layer,
+                    norm_layer=norm_layer,
+                    mlp_ratio=mlp_ratios[i],
+                )
+            )
             prev_chs = out_chs
         self.stages = nn.Sequential(*stages)
         self.num_features = prev_chs
@@ -250,8 +271,8 @@ class MetaNeXt(nn.Module):
 
     @torch.jit.ignore
     def no_weight_decay(self):
-        return {'norm'}
-    
+        return {"norm"}
+
     def forward(self, x):
         input_size = x.size(2)
         scale = [4, 8, 16, 32]
@@ -266,19 +287,26 @@ class MetaNeXt(nn.Module):
 
     def _init_weights(self, m):
         if isinstance(m, (nn.Conv2d, nn.Linear)):
-            trunc_normal_(m.weight, std=.02)
+            trunc_normal_(m.weight, std=0.02)
             if m.bias is not None:
                 nn.init.constant_(m.bias, 0)
 
-def _cfg(url='', **kwargs):
+
+def _cfg(url="", **kwargs):
     return {
-        'url': url,
-        'num_classes': 1000, 'input_size': (3, 224, 224), 'pool_size': (7, 7),
-        'crop_pct': 0.875, 'interpolation': 'bicubic',
-        'mean': IMAGENET_DEFAULT_MEAN, 'std': IMAGENET_DEFAULT_STD,
-        'first_conv': 'stem.0', 'classifier': 'head.fc',
-        **kwargs
+        "url": url,
+        "num_classes": 1000,
+        "input_size": (3, 224, 224),
+        "pool_size": (7, 7),
+        "crop_pct": 0.875,
+        "interpolation": "bicubic",
+        "mean": IMAGENET_DEFAULT_MEAN,
+        "std": IMAGENET_DEFAULT_STD,
+        "first_conv": "stem.0",
+        "classifier": "head.fc",
+        **kwargs,
     }
+
 
 def update_weight(model_dict, weight_dict):
     idx, temp_dict = 0, {}
@@ -287,71 +315,79 @@ def update_weight(model_dict, weight_dict):
             temp_dict[k] = v
             idx += 1
     model_dict.update(temp_dict)
-    print(f'loading weights... {idx}/{len(model_dict)} items')
+    print(f"loading weights... {idx}/{len(model_dict)} items")
     return model_dict
+
 
 default_cfgs = dict(
     inceptionnext_tiny=_cfg(
-        url='https://github.com/sail-sg/inceptionnext/releases/download/model/inceptionnext_tiny.pth',
+        url="https://github.com/sail-sg/inceptionnext/releases/download/model/inceptionnext_tiny.pth",
     ),
     inceptionnext_small=_cfg(
-        url='https://github.com/sail-sg/inceptionnext/releases/download/model/inceptionnext_small.pth',
+        url="https://github.com/sail-sg/inceptionnext/releases/download/model/inceptionnext_small.pth",
     ),
     inceptionnext_base=_cfg(
-        url='https://github.com/sail-sg/inceptionnext/releases/download/model/inceptionnext_base.pth',
+        url="https://github.com/sail-sg/inceptionnext/releases/download/model/inceptionnext_base.pth",
     ),
     inceptionnext_base_384=_cfg(
-        url='https://github.com/sail-sg/inceptionnext/releases/download/model/inceptionnext_base_384.pth',
-        input_size=(3, 384, 384), crop_pct=1.0,
+        url="https://github.com/sail-sg/inceptionnext/releases/download/model/inceptionnext_base_384.pth",
+        input_size=(3, 384, 384),
+        crop_pct=1.0,
     ),
 )
 
+
 def inceptionnext_tiny(pretrained=False, **kwargs):
-    model = MetaNeXt(depths=(3, 3, 9, 3), dims=(96, 192, 384, 768), 
-                      token_mixers=InceptionDWConv2d,
-                      **kwargs
-    )
-    model.default_cfg = default_cfgs['inceptionnext_tiny']
+    model = MetaNeXt(depths=(3, 3, 9, 3), dims=(96, 192, 384, 768), token_mixers=InceptionDWConv2d, **kwargs)
+    model.default_cfg = default_cfgs["inceptionnext_tiny"]
     if pretrained:
-        state_dict = torch.hub.load_state_dict_from_url(url=model.default_cfg['url'], map_location="cpu", check_hash=True)
+        state_dict = torch.hub.load_state_dict_from_url(
+            url=model.default_cfg["url"], map_location="cpu", check_hash=True
+        )
         model.load_state_dict(state_dict)
     return model
+
 
 def inceptionnext_small(pretrained=False, **kwargs):
-    model = MetaNeXt(depths=(3, 3, 27, 3), dims=(96, 192, 384, 768), 
-                      token_mixers=InceptionDWConv2d,
-                      **kwargs
-    )
-    model.default_cfg = default_cfgs['inceptionnext_small']
+    model = MetaNeXt(depths=(3, 3, 27, 3), dims=(96, 192, 384, 768), token_mixers=InceptionDWConv2d, **kwargs)
+    model.default_cfg = default_cfgs["inceptionnext_small"]
     if pretrained:
-        state_dict = torch.hub.load_state_dict_from_url(url=model.default_cfg['url'], map_location="cpu", check_hash=True)
+        state_dict = torch.hub.load_state_dict_from_url(
+            url=model.default_cfg["url"], map_location="cpu", check_hash=True
+        )
         model.load_state_dict(state_dict)
     return model
+
 
 def inceptionnext_base(pretrained=False, **kwargs):
-    model = MetaNeXt(depths=(3, 3, 27, 3), dims=(128, 256, 512, 1024), 
-                      token_mixers=InceptionDWConv2d,
-                      **kwargs
-    )
-    model.default_cfg = default_cfgs['inceptionnext_base']
+    model = MetaNeXt(depths=(3, 3, 27, 3), dims=(128, 256, 512, 1024), token_mixers=InceptionDWConv2d, **kwargs)
+    model.default_cfg = default_cfgs["inceptionnext_base"]
     if pretrained:
-        state_dict = torch.hub.load_state_dict_from_url(url=model.default_cfg['url'], map_location="cpu", check_hash=True)
+        state_dict = torch.hub.load_state_dict_from_url(
+            url=model.default_cfg["url"], map_location="cpu", check_hash=True
+        )
         model.load_state_dict(state_dict)
     return model
+
 
 def inceptionnext_base_384(pretrained=False, **kwargs):
-    model = MetaNeXt(depths=[3, 3, 27, 3], dims=[128, 256, 512, 1024], 
-                      mlp_ratios=[4, 4, 4, 3],
-                      token_mixers=InceptionDWConv2d,
-                      **kwargs
+    model = MetaNeXt(
+        depths=[3, 3, 27, 3],
+        dims=[128, 256, 512, 1024],
+        mlp_ratios=[4, 4, 4, 3],
+        token_mixers=InceptionDWConv2d,
+        **kwargs,
     )
-    model.default_cfg = default_cfgs['inceptionnext_base_384']
+    model.default_cfg = default_cfgs["inceptionnext_base_384"]
     if pretrained:
-        state_dict = torch.hub.load_state_dict_from_url(url=model.default_cfg['url'], map_location="cpu", check_hash=True)
+        state_dict = torch.hub.load_state_dict_from_url(
+            url=model.default_cfg["url"], map_location="cpu", check_hash=True
+        )
         model.load_state_dict(state_dict)
     return model
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     model = inceptionnext_tiny(pretrained=False)
     inputs = torch.randn((1, 3, 640, 640))
     for i in model(inputs):

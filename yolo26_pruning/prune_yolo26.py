@@ -2,7 +2,6 @@ import argparse
 import json
 import sys
 import warnings
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
@@ -35,7 +34,9 @@ def parse_args():
     parser.add_argument("--lr0", type=float, default=0.001, help="微调初始学习率，建议小于原训练学习率。")
     parser.add_argument("--optimizer", default="SGD", help="微调优化器。")
     parser.add_argument("--no-val", action="store_true", help="跳过剪枝前后验证。")
-    parser.add_argument("--include-detect-inner", action="store_true", help="同时剪检测头内部中间 Conv，仍会跳过最终输出 Conv。")
+    parser.add_argument(
+        "--include-detect-inner", action="store_true", help="同时剪检测头内部中间 Conv，仍会跳过最终输出 Conv。"
+    )
     parser.add_argument("--dry-run", action="store_true", help="只打印可剪层和统计，不保存权重。")
     return parser.parse_args()
 

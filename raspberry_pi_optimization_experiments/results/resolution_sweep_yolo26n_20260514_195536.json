@@ -22,18 +22,10 @@
           "postprocess": 0.06765979746434467
         },
         "save_dir": "/home/admin1/Projects/ultralytics-main/raspberry_pi_optimization_experiments/results/val_resolution_sweep/yolo26n_imgsz640",
-        "class_precision": [
-          0.9723857477898483
-        ],
-        "class_recall": [
-          0.978144729035032
-        ],
-        "class_map50": [
-          0.9918367852700718
-        ],
-        "class_map50_95": [
-          0.8520301998776295
-        ]
+        "class_precision": [0.9723857477898483],
+        "class_recall": [0.978144729035032],
+        "class_map50": [0.9918367852700718],
+        "class_map50_95": [0.8520301998776295]
       }
     },
     {
@@ -52,18 +44,10 @@
           "postprocess": 0.07657002480970126
         },
         "save_dir": "/home/admin1/Projects/ultralytics-main/raspberry_pi_optimization_experiments/results/val_resolution_sweep/yolo26n_imgsz512",
-        "class_precision": [
-          0.9731687244107738
-        ],
-        "class_recall": [
-          0.9652777777777778
-        ],
-        "class_map50": [
-          0.991194666545331
-        ],
-        "class_map50_95": [
-          0.8326431101131275
-        ]
+        "class_precision": [0.9731687244107738],
+        "class_recall": [0.9652777777777778],
+        "class_map50": [0.991194666545331],
+        "class_map50_95": [0.8326431101131275]
       }
     },
     {
@@ -82,18 +66,10 @@
           "postprocess": 0.07298010194799909
         },
         "save_dir": "/home/admin1/Projects/ultralytics-main/raspberry_pi_optimization_experiments/results/val_resolution_sweep/yolo26n_imgsz416",
-        "class_precision": [
-          0.969083954038461
-        ],
-        "class_recall": [
-          0.9565972222222222
-        ],
-        "class_map50": [
-          0.9831857768580603
-        ],
-        "class_map50_95": [
-          0.788923346990856
-        ]
+        "class_precision": [0.969083954038461],
+        "class_recall": [0.9565972222222222],
+        "class_map50": [0.9831857768580603],
+        "class_map50_95": [0.788923346990856]
       }
     },
     {
@@ -112,18 +88,10 @@
           "postprocess": 0.07137403916268104
         },
         "save_dir": "/home/admin1/Projects/ultralytics-main/raspberry_pi_optimization_experiments/results/val_resolution_sweep/yolo26n_imgsz320",
-        "class_precision": [
-          0.9583698807585317
-        ],
-        "class_recall": [
-          0.9184027777777778
-        ],
-        "class_map50": [
-          0.9729546496668504
-        ],
-        "class_map50_95": [
-          0.6889724963622228
-        ]
+        "class_precision": [0.9583698807585317],
+        "class_recall": [0.9184027777777778],
+        "class_map50": [0.9729546496668504],
+        "class_map50_95": [0.6889724963622228]
       }
     }
   ]

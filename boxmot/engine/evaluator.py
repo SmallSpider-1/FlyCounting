@@ -1,71 +1,138 @@
 # Mikel Broström 🔥 BoxMOT 🧾 AGPL-3.0 license
 
+from __future__ import annotations
+
 import multiprocessing as mp
+
 mp.set_start_method("spawn", force=True)
 
 import argparse
-import subprocess
-from pathlib import Path
-import numpy as np
-from tqdm import tqdm
-import json
-import yaml
-import cv2
-import os
-import torch
-import sys
 import concurrent.futures
+import json
+import os
+import subprocess
+import sys
 from contextlib import nullcontext
+from pathlib import Path
 
-from boxmot.trackers.tracker_zoo import create_tracker
-from boxmot.utils import NUM_THREADS, ROOT, WEIGHTS, TRACKER_CONFIGS, DATASET_CONFIGS, logger as LOGGER, TRACKEVAL
-from boxmot.utils.checks import RequirementsChecker
-from boxmot.utils.torch_utils import select_device
-from boxmot.utils.plots import MetricsPlotter
-from boxmot.utils.misc import increment_path, prompt_overwrite
-from boxmot.utils.timing import TimingStats, wrap_tracker_reid
-from typing import Optional, List, Dict, Generator, Union
+import cv2
+import numpy as np
+import torch
+import yaml
+from tqdm import tqdm
 
-from boxmot.utils.dataloaders.dataset import MOTDataset
-from boxmot.postprocessing.gsi import gsi
-
-from boxmot.engine.inference import DetectorReIDPipeline, extract_detections, filter_detections
 from boxmot.detectors import default_imgsz
-from boxmot.utils.mot_utils import convert_to_mot_format, write_mot_results
+from boxmot.engine.inference import DetectorReIDPipeline, extract_detections, filter_detections
+from boxmot.trackers.tracker_zoo import create_tracker
+from boxmot.utils import DATASET_CONFIGS, NUM_THREADS, ROOT, TRACKER_CONFIGS, TRACKEVAL, WEIGHTS
+from boxmot.utils import logger as LOGGER
+from boxmot.utils.checks import RequirementsChecker
+from boxmot.utils.dataloaders.dataset import MOTDataset
 from boxmot.utils.download import download_eval_data, download_trackeval
+from boxmot.utils.misc import increment_path, prompt_overwrite
+from boxmot.utils.mot_utils import convert_to_mot_format, write_mot_results
+from boxmot.utils.plots import MetricsPlotter
+from boxmot.utils.timing import TimingStats
+from boxmot.utils.torch_utils import select_device
 
 checker = RequirementsChecker()
-checker.check_packages(('ultralytics', ))  # install
+checker.check_packages(("ultralytics",))  # install
 
 
 COCO_CLASSES = [
-    'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light',
-    'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
-    'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
-    'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket', 'bottle',
-    'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple', 'sandwich', 'orange',
-    'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch', 'potted plant', 'bed',
-    'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven',
-    'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush'
+    "person",
+    "bicycle",
+    "car",
+    "motorcycle",
+    "airplane",
+    "bus",
+    "train",
+    "truck",
+    "boat",
+    "traffic light",
+    "fire hydrant",
+    "stop sign",
+    "parking meter",
+    "bench",
+    "bird",
+    "cat",
+    "dog",
+    "horse",
+    "sheep",
+    "cow",
+    "elephant",
+    "bear",
+    "zebra",
+    "giraffe",
+    "backpack",
+    "umbrella",
+    "handbag",
+    "tie",
+    "suitcase",
+    "frisbee",
+    "skis",
+    "snowboard",
+    "sports ball",
+    "kite",
+    "baseball bat",
+    "baseball glove",
+    "skateboard",
+    "surfboard",
+    "tennis racket",
+    "bottle",
+    "wine glass",
+    "cup",
+    "fork",
+    "knife",
+    "spoon",
+    "bowl",
+    "banana",
+    "apple",
+    "sandwich",
+    "orange",
+    "broccoli",
+    "carrot",
+    "hot dog",
+    "pizza",
+    "donut",
+    "cake",
+    "chair",
+    "couch",
+    "potted plant",
+    "bed",
+    "dining table",
+    "toilet",
+    "tv",
+    "laptop",
+    "mouse",
+    "remote",
+    "keyboard",
+    "cell phone",
+    "microwave",
+    "oven",
+    "toaster",
+    "sink",
+    "refrigerator",
+    "book",
+    "clock",
+    "vase",
+    "scissors",
+    "teddy bear",
+    "hair drier",
+    "toothbrush",
 ]
 
 
 def load_dataset_cfg(name: str) -> dict:
     """Load the dict from boxmot/configs/datasets/{name}.yaml."""
     path = DATASET_CONFIGS / f"{name}.yaml"
-    with open(path, 'r') as f:
+    with open(path) as f:
         return yaml.safe_load(f)
 
 
-def eval_init(args,
-              trackeval_dest: Path = TRACKEVAL,
-              branch: str = "master",
-              overwrite: bool = False
-    ) -> None:
-    """
-    Common initialization: download TrackEval and (if needed) the MOT-challenge
-    data for ablation runs, then canonicalize args.source.
-    Modifies args in place.
+def eval_init(args, trackeval_dest: Path = TRACKEVAL, branch: str = "master", overwrite: bool = False) -> None:
+    """Common initialization: download TrackEval and (if needed) the MOT-challenge data for ablation runs, then
+    canonicalize args.source. Modifies args in place.
     """
     # 1) download the TrackEval code
     download_trackeval(dest=trackeval_dest, branch=branch, overwrite=overwrite)
@@ -73,7 +140,7 @@ def eval_init(args,
     # 2) if doing MOT17/20-ablation, pull down the dataset and rewire args.source/split
     if (DATASET_CONFIGS / f"{args.source}.yaml").exists():
         cfg = load_dataset_cfg(str(args.source))
-        
+
         # Determine dataset destination (under trackeval/data so benchmarks don't mix with TrackEval code)
         bench_name = Path(cfg["benchmark"]["source"]).name
         dataset_url = cfg["download"]["dataset_url"]
@@ -89,7 +156,7 @@ def eval_init(args,
             runs_url=cfg["download"]["runs_url"],
             dataset_url=cfg["download"]["dataset_url"],
             dataset_dest=dataset_dest,
-            overwrite=overwrite
+            overwrite=overwrite,
         )
         args.benchmark = bench_name
         args.split = cfg["benchmark"]["split"]
@@ -107,53 +174,52 @@ def eval_init(args,
 
 
 def parse_mot_results(results: str) -> dict:
-    """
-    Extracts COMBINED HOTA, MOTA, IDF1, AssA, AssRe, IDSW, and IDs from MOTChallenge evaluation output.
-    Returns a dictionary keyed by class name.
+    """Extracts COMBINED HOTA, MOTA, IDF1, AssA, AssRe, IDSW, and IDs from MOTChallenge evaluation output. Returns a
+    dictionary keyed by class name.
     """
     metric_specs = {
-        'HOTA':   ('HOTA:',      {'HOTA': 0, 'AssA': 2, 'AssRe': 5}),
-        'MOTA':   ('CLEAR:',     {'MOTA': 0, 'IDSW': 12}),
-        'IDF1':   ('Identity:',  {'IDF1': 0}),
-        'IDs':    ('Count:',     {'IDs': 2}),
+        "HOTA": ("HOTA:", {"HOTA": 0, "AssA": 2, "AssRe": 5}),
+        "MOTA": ("CLEAR:", {"MOTA": 0, "IDSW": 12}),
+        "IDF1": ("Identity:", {"IDF1": 0}),
+        "IDs": ("Count:", {"IDs": 2}),
     }
 
-    int_fields = {'IDSW', 'IDs'}
+    int_fields = {"IDSW", "IDs"}
     parsed_results = {}
-    
+
     lines = results.splitlines()
     current_class = None
     current_metric_type = None
-    
+
     for line in lines:
         line = line.strip()
         if not line:
             continue
-            
+
         # Check for header lines
         is_header = False
         for metric_name, (prefix, _) in metric_specs.items():
             if line.startswith(prefix):
                 is_header = True
                 current_metric_type = metric_name
-                
+
                 # Format: "HOTA: tracker-classHOTA ..."
-                content = line[len(prefix):].strip()
+                content = line[len(prefix) :].strip()
                 first_word = content.split()[0]
                 if first_word.endswith(metric_name):
-                    tracker_class = first_word[:-len(metric_name)]
-                    if '-' in tracker_class:
-                        current_class = tracker_class.split('-')[-1]
+                    tracker_class = first_word[: -len(metric_name)]
+                    if "-" in tracker_class:
+                        current_class = tracker_class.split("-")[-1]
                     else:
-                        current_class = 'default'
-                    
+                        current_class = "default"
+
                     if current_class not in parsed_results:
-                        parsed_results[current_class] = {'per_sequence': {}}
+                        parsed_results[current_class] = {"per_sequence": {}}
                 break
-        
+
         if is_header:
             continue
-        
+
         # Check for data rows (COMBINED or sequence names)
         if current_class and current_metric_type:
             fields = line.split()
@@ -161,8 +227,8 @@ def parse_mot_results(results: str) -> dict:
                 row_name = fields[0]  # Either 'COMBINED' or sequence name like 'MOT17-02-FRCNN'
                 values = fields[1:]
                 _, field_map = metric_specs[current_metric_type]
-                
-                if row_name == 'COMBINED':
+
+                if row_name == "COMBINED":
                     # Store COMBINED metrics at class level (backward compatible)
                     for key, idx in field_map.items():
                         if idx < len(values):
@@ -170,12 +236,14 @@ def parse_mot_results(results: str) -> dict:
                             parsed_results[current_class][key] = max(0, int(val) if key in int_fields else float(val))
                 else:
                     # Store per-sequence metrics
-                    if row_name not in parsed_results[current_class]['per_sequence']:
-                        parsed_results[current_class]['per_sequence'][row_name] = {}
+                    if row_name not in parsed_results[current_class]["per_sequence"]:
+                        parsed_results[current_class]["per_sequence"][row_name] = {}
                     for key, idx in field_map.items():
                         if idx < len(values):
                             val = values[idx]
-                            parsed_results[current_class]['per_sequence'][row_name][key] = max(0, int(val) if key in int_fields else float(val))
+                            parsed_results[current_class]["per_sequence"][row_name][key] = max(
+                                0, int(val) if key in int_fields else float(val)
+                            )
 
     return parsed_results
 
@@ -272,7 +340,7 @@ def _clear_device_cache(device: str) -> None:
 def _count_data_lines(path: Path, skip_header: bool = False) -> int:
     """Count non-header lines in a txt file, tolerating missing files."""
     try:
-        with open(path, "r") as fh:
+        with open(path) as fh:
             if skip_header:
                 return sum(1 for line in fh if not line.startswith("#"))
             return sum(1 for _ in fh)
@@ -284,7 +352,7 @@ def _max_frame_id(path: Path) -> int:
     """Return the maximum frame id (first column) in a dets txt, skipping headers."""
     max_f = 0
     try:
-        with open(path, "r") as fh:
+        with open(path) as fh:
             for line in fh:
                 line = line.strip()
                 if not line or line.startswith("#"):
@@ -304,10 +372,11 @@ def _max_frame_id(path: Path) -> int:
 
 
 @torch.inference_mode()
-def generate_dets_embs_batched(args: argparse.Namespace, y: Path, source_root: Path, timing_stats: Optional[TimingStats] = None) -> None:
-    """
-    Generate detections and embeddings in batches for evaluation.
-    
+def generate_dets_embs_batched(
+    args: argparse.Namespace, y: Path, source_root: Path, timing_stats: TimingStats | None = None
+) -> None:
+    """Generate detections and embeddings in batches for evaluation.
+
     Args:
         args: CLI arguments.
         y: Path to YOLO model weights.
@@ -394,9 +463,7 @@ def generate_dets_embs_batched(args: argparse.Namespace, y: Path, source_root: P
             if expected_files and rows_match and det_rows > 0:
                 processed = min(det_max_frame, len(frames))
             elif expected_files and not rows_match:
-                LOGGER.warning(
-                    f"Cached det/emb rows mismatch for {seq_name}; resetting cached data."
-                )
+                LOGGER.warning(f"Cached det/emb rows mismatch for {seq_name}; resetting cached data.")
                 for p in [dets_path, *emb_paths.values()]:
                     try:
                         p.unlink()
@@ -406,9 +473,7 @@ def generate_dets_embs_batched(args: argparse.Namespace, y: Path, source_root: P
 
         if resume and processed >= len(frames) and dets_path.exists() and all(ep.exists() for ep in emb_paths.values()):
             if expected_files and rows_match and det_rows:
-                LOGGER.info(
-                    f"Skipping {seq_name} (cached complete; {processed}/{len(frames)} frames)."
-                )
+                LOGGER.info(f"Skipping {seq_name} (cached complete; {processed}/{len(frames)} frames).")
             else:
                 LOGGER.info(f"Skipping {seq_name} (resume: already complete).")
             initial_done += len(frames)
@@ -418,20 +483,20 @@ def generate_dets_embs_batched(args: argparse.Namespace, y: Path, source_root: P
             LOGGER.info(f"Resuming {seq_name}: cached {processed}/{len(frames)} frames.")
 
         if (not resume) and dets_path.exists() and any_emb_cached:
-            if not prompt_overwrite('Detections and Embeddings', dets_path, args.ci):
+            if not prompt_overwrite("Detections and Embeddings", dets_path, args.ci):
                 LOGGER.debug(f"Skipping {seq_name} (cached).")
                 continue
 
         dets_path.parent.mkdir(parents=True, exist_ok=True)
-        mode = 'ab' if (resume and dets_path.exists()) else 'wb'
+        mode = "ab" if (resume and dets_path.exists()) else "wb"
         det_fhs[seq_name] = open(dets_path, mode, buffering=1024 * 1024)
-        if mode == 'wb' or dets_path.stat().st_size == 0:
-            np.savetxt(det_fhs[seq_name], [], fmt='%f', header=str(img_dir))
+        if mode == "wb" or dets_path.stat().st_size == 0:
+            np.savetxt(det_fhs[seq_name], [], fmt="%f", header=str(img_dir))
 
         for r in args.reid_model:
             ep = emb_paths[r.stem]
             ep.parent.mkdir(parents=True, exist_ok=True)
-            emb_mode = 'ab' if (resume and ep.exists()) else 'wb'
+            emb_mode = "ab" if (resume and ep.exists()) else "wb"
             emb_fhs[r.stem][seq_name] = open(ep, emb_mode, buffering=1024 * 1024)
 
         seq_states[seq_name] = {"frames": frames, "i": processed, "img_dir": img_dir}
@@ -530,7 +595,7 @@ def generate_dets_embs_batched(args: argparse.Namespace, y: Path, source_root: P
                     # Use unified detection extraction and filtering
                     dets = extract_detections(r)
                     dets = filter_detections(dets, min_area=10.0, remove_degenerate=True)
-                    
+
                     if len(dets) == 0:
                         if timing_stats:
                             timing_stats.frames += 1
@@ -539,7 +604,7 @@ def generate_dets_embs_batched(args: argparse.Namespace, y: Path, source_root: P
 
                     boxes = dets[:, :4]
                     confs = dets[:, 4:5]  # Keep as 2D for concatenation
-                    clss = dets[:, 5:6]   # Keep as 2D for concatenation
+                    clss = dets[:, 5:6]  # Keep as 2D for concatenation
 
                     # Build detection array with frame_id column: [frame_id, x1, y1, x2, y2, conf, cls]
                     frame_col = np.full((boxes.shape[0], 1), float(frame_id), dtype=np.float32)
@@ -549,7 +614,7 @@ def generate_dets_embs_batched(args: argparse.Namespace, y: Path, source_root: P
                     np.savetxt(det_fhs[seq_name], dets_np, fmt="%f")
 
                     det_boxes_np = dets_np[:, 1:5]
-                    
+
                     # Use pipeline's ReID models (with timing instrumentation)
                     all_embs = pipeline.get_all_reid_features(det_boxes_np, img)
                     for reid_name, embs in all_embs.items():
@@ -566,14 +631,13 @@ def generate_dets_embs_batched(args: argparse.Namespace, y: Path, source_root: P
                     # Update frame count for timing
                     if timing_stats:
                         timing_stats.frames += 1
-                    
+
                     pbar.update(1)
                     touched.add(seq_name)
 
                 if emb_dims:
                     LOGGER.info(
-                        "ReID embedding dims per model: "
-                        + ", ".join([f"{k}={v}" for k, v in emb_dims.items()])
+                        "ReID embedding dims per model: " + ", ".join([f"{k}={v}" for k, v in emb_dims.items()])
                     )
                 else:
                     LOGGER.info("ReID embedding dims per model: n/a (no detections)")
@@ -606,10 +670,9 @@ def generate_dets_embs_batched(args: argparse.Namespace, y: Path, source_root: P
                     pass
 
 
-def run_generate_dets_embs(args: argparse.Namespace, timing_stats: Optional[TimingStats] = None) -> None:
-    """
-    Generate detections and embeddings for all sequences.
-    
+def run_generate_dets_embs(args: argparse.Namespace, timing_stats: TimingStats | None = None) -> None:
+    """Generate detections and embeddings for all sequences.
+
     Args:
         args: CLI arguments.
         timing_stats: Optional TimingStats for timing instrumentation.
@@ -628,6 +691,7 @@ def run_generate_dets_embs(args: argparse.Namespace, timing_stats: Optional[Timi
         LOGGER.info(f"Generating dets+embs (batched single-process): {y.name}")
         generate_dets_embs_batched(args, y, source_root, timing_stats=timing_stats)
 
+
 def build_dataset_eval_settings(
     args: argparse.Namespace,
     gt_folder: Path,
@@ -637,14 +701,13 @@ def build_dataset_eval_settings(
 
     This centralizes logic for MOT-style datasets and non-MOT layouts such as VisDrone.
     """
-
     cfg = {}
     try:
         if hasattr(args, "benchmark"):
             cfg = load_dataset_cfg(args.benchmark)
     except FileNotFoundError:
         cfg = {}
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         LOGGER.warning(f"Error loading dataset config: {e}")
         cfg = {}
 
@@ -717,10 +780,9 @@ def trackeval(
     save_dir: Path,
     gt_folder: Path,
     metrics: list = ["HOTA", "CLEAR", "Identity"],
-    seq_info: Optional[dict] = None,
+    seq_info: dict | None = None,
 ) -> str:
-    """
-    Executes a Python script to evaluate MOT challenge tracking results using specified metrics.
+    """Executes a Python script to evaluate MOT challenge tracking results using specified metrics.
 
     Args:
         seq_paths (list): List of sequence paths.
@@ -731,7 +793,6 @@ def trackeval(
     Returns:
         str: Standard output from the evaluation script.
     """
-
     if not seq_info:
         seq_names = [seq_path.parent.name if seq_path.name == "img1" else seq_path.name for seq_path in seq_paths]
         seq_info = {name: None for name in seq_names}
@@ -749,30 +810,41 @@ def trackeval(
     benchmark_name = dataset_settings["benchmark_name"]
 
     cmd_args = [
-        sys.executable, ROOT / 'boxmot' / 'utils' / 'run_mot_challenge.py',
-        "--GT_FOLDER", str(gt_folder),
-        "--BENCHMARK", benchmark_name,
-        "--TRACKERS_FOLDER", str(args.exp_dir.parent),
-        "--TRACKERS_TO_EVAL", args.exp_dir.name,
-        "--SPLIT_TO_EVAL", args.split,
-        "--METRICS", *metrics,
-        "--USE_PARALLEL", "True",
-        "--TRACKER_SUB_FOLDER", "",
-        "--NUM_PARALLEL_CORES", str(4),
-        "--SKIP_SPLIT_FOL", "True",
-        "--GT_LOC_FORMAT", gt_loc_format,
-        "--CLASSES_TO_EVAL", *classes_to_eval,
-        "--CLASS_IDS", *[str(i) for i in class_ids],
-        "--DISTRACTOR_CLASS_IDS", *[str(i) for i in distractor_ids],
-        "--SEQ_INFO", *seq_info_args
+        sys.executable,
+        ROOT / "boxmot" / "utils" / "run_mot_challenge.py",
+        "--GT_FOLDER",
+        str(gt_folder),
+        "--BENCHMARK",
+        benchmark_name,
+        "--TRACKERS_FOLDER",
+        str(args.exp_dir.parent),
+        "--TRACKERS_TO_EVAL",
+        args.exp_dir.name,
+        "--SPLIT_TO_EVAL",
+        args.split,
+        "--METRICS",
+        *metrics,
+        "--USE_PARALLEL",
+        "True",
+        "--TRACKER_SUB_FOLDER",
+        "",
+        "--NUM_PARALLEL_CORES",
+        str(4),
+        "--SKIP_SPLIT_FOL",
+        "True",
+        "--GT_LOC_FORMAT",
+        gt_loc_format,
+        "--CLASSES_TO_EVAL",
+        *classes_to_eval,
+        "--CLASS_IDS",
+        *[str(i) for i in class_ids],
+        "--DISTRACTOR_CLASS_IDS",
+        *[str(i) for i in distractor_ids],
+        "--SEQ_INFO",
+        *seq_info_args,
     ]
 
-    p = subprocess.Popen(
-        args=cmd_args,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True
-    )
+    p = subprocess.Popen(args=cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
     stdout, stderr = p.communicate()
 
@@ -781,25 +853,24 @@ def trackeval(
     return stdout
 
 
+def process_sequence(
+    seq_name: str,
+    mot_root: str,
+    project_root: str,
+    model_name: str,
+    reid_name: str,
+    tracking_method: str,
+    exp_folder: str,
+    target_fps: int | None,
+    device: str,
+    cfg_dict: dict | None = None,
+    dataset_name: str | None = None,
+):
+    """Process a single sequence: run tracker on pre-computed detections/embeddings.
 
-def process_sequence(seq_name: str,
-                     mot_root: str,
-                     project_root: str,
-                     model_name: str,
-                     reid_name: str,
-                     tracking_method: str,
-                     exp_folder: str,
-                     target_fps: Optional[int],
-                     device: str,
-                     cfg_dict: Optional[Dict] = None,
-                     dataset_name: Optional[str] = None,
-                     ):
-    """
-    Process a single sequence: run tracker on pre-computed detections/embeddings.
-    
     Returns:
-        Tuple of (seq_name, kept_frame_ids, timing_dict) where timing_dict contains
-        'track_time_ms' and 'num_frames' for aggregating timing stats.
+        Tuple of (seq_name, kept_frame_ids, timing_dict) where timing_dict contains: 'track_time_ms' and 'num_frames'
+            for aggregating timing stats.
     """
     import time
 
@@ -824,7 +895,7 @@ def process_sequence(seq_name: str,
         det_emb_root=str(det_emb_root),
         model_name=model_name,
         reid_name=reid_name,
-        target_fps=target_fps
+        target_fps=target_fps,
     )
     sequence = dataset.get_sequence(seq_name)
 
@@ -832,12 +903,12 @@ def process_sequence(seq_name: str,
     kept_frame_ids = []
     total_track_time_ms = 0.0
     num_frames = 0
-    
+
     for frame in sequence:
-        fid  = int(frame['frame_id'])
-        dets = frame['dets']
-        embs = frame['embs']
-        img  = frame['img']
+        fid = int(frame["frame_id"])
+        dets = frame["dets"]
+        embs = frame["embs"]
+        img = frame["img"]
 
         kept_frame_ids.append(fid)
         num_frames += 1
@@ -855,37 +926,40 @@ def process_sequence(seq_name: str,
             t0 = time.perf_counter()
             tracks = tracker.update(dets, img, embs)
             total_track_time_ms += (time.perf_counter() - t0) * 1000
-            
+
             if tracks.size:
                 all_tracks.append(convert_to_mot_format(tracks, fid))
 
     out_arr = np.vstack(all_tracks) if all_tracks else np.empty((0, 0))
     write_mot_results(Path(exp_folder) / f"{seq_name}.txt", out_arr)
-    
+
     timing_dict = {
-        'track_time_ms': total_track_time_ms,
-        'num_frames': num_frames,
+        "track_time_ms": total_track_time_ms,
+        "num_frames": num_frames,
     }
     return seq_name, kept_frame_ids, timing_dict
 
 
 from boxmot.utils import configure_logging as _configure_logging
 
+
 def _worker_init():
     # each spawned process needs its own sinks
     _configure_logging()
 
-def run_generate_mot_results(args: argparse.Namespace, evolve_config: dict = None, timing_stats: Optional[TimingStats] = None) -> None:
-    """
-    Run tracker on pre-computed detections/embeddings and generate MOT result files.
-    
+
+def run_generate_mot_results(
+    args: argparse.Namespace, evolve_config: dict | None = None, timing_stats: TimingStats | None = None
+) -> None:
+    """Run tracker on pre-computed detections/embeddings and generate MOT result files.
+
     Args:
         args: CLI arguments.
         evolve_config: Optional config dict for hyperparameter tuning.
         timing_stats: Optional TimingStats to record tracking/association time.
     """
-    # Prepare experiment folder: runs/mot/<dataset_name>/model_reid_tracker when benchmark is set
-    base = args.project / "mot"
+    # Prepare experiment folder: runs/not/<dataset_name>/model_reid_tracker when benchmark is set
+    base = args.project / "not"
     if getattr(args, "benchmark", None):
         base = base / args.benchmark
     base = base / f"{args.yolo_model[0].stem}_{args.reid_model[0].stem}_{args.tracking_method}"
@@ -927,9 +1001,7 @@ def run_generate_mot_results(args: argparse.Namespace, evolve_config: dict = Non
     total_track_frames = 0
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=NUM_THREADS, initializer=_worker_init) as executor:
-        futures = {
-            executor.submit(process_sequence, *args): args[0] for args in task_args
-        }
+        futures = {executor.submit(process_sequence, *args): args[0] for args in task_args}
 
         for fut in concurrent.futures.as_completed(futures):
             seq = futures[fut]
@@ -937,14 +1009,14 @@ def run_generate_mot_results(args: argparse.Namespace, evolve_config: dict = Non
                 seq_name, kept_ids, timing_dict = fut.result()
                 seq_frame_nums[seq_name] = kept_ids
                 # Aggregate timing from worker process
-                total_track_time_ms += timing_dict.get('track_time_ms', 0)
-                total_track_frames += timing_dict.get('num_frames', 0)
+                total_track_time_ms += timing_dict.get("track_time_ms", 0)
+                total_track_frames += timing_dict.get("num_frames", 0)
             except Exception:
                 LOGGER.exception(f"Error processing {seq}")
-    
+
     # Record aggregated tracking time in timing_stats
     if timing_stats is not None:
-        timing_stats.totals['track'] += total_track_time_ms
+        timing_stats.totals["track"] += total_track_time_ms
         # Also update frame count if not already set (from batch mode)
         if timing_stats.frames == 0 and total_track_frames > 0:
             timing_stats.frames = total_track_frames
@@ -961,17 +1033,18 @@ def run_generate_mot_results(args: argparse.Namespace, evolve_config: dict = Non
     if getattr(args, "postprocessing", "none") == "gsi":
         LOGGER.opt(colors=True).info("<cyan>[3b/4]</cyan> Applying GSI postprocessing...")
         from boxmot.postprocessing.gsi import gsi
+
         gsi(mot_results_folder=exp_dir)
 
     elif getattr(args, "postprocessing", "none") == "gbrc":
         LOGGER.opt(colors=True).info("<cyan>[3b/4]</cyan> Applying GBRC postprocessing...")
         from boxmot.postprocessing.gbrc import gbrc
+
         gbrc(mot_results_folder=exp_dir)
 
 
 def run_trackeval(args: argparse.Namespace, verbose: bool = True) -> dict:
-    """
-    Runs the trackeval function to evaluate tracking results.
+    """Runs the trackeval function to evaluate tracking results.
 
     Args:
         args (Namespace): Parsed command line arguments.
@@ -990,7 +1063,7 @@ def run_trackeval(args: argparse.Namespace, verbose: bool = True) -> dict:
             if not ann_file.exists():
                 continue
             try:
-                with open(ann_file, "r") as f:
+                with open(ann_file) as f:
                     max_frame = 0
                     for line in f:
                         if not line.strip():
@@ -1013,7 +1086,7 @@ def run_trackeval(args: argparse.Namespace, verbose: bool = True) -> dict:
 
     # Load config to filter classes
     # Try to load config from benchmark name first, then fallback to source parent name
-    cfg_name = getattr(args, 'benchmark', str(args.source.parent.name))
+    cfg_name = getattr(args, "benchmark", str(args.source.parent.name))
     try:
         cfg = load_dataset_cfg(cfg_name)
     except FileNotFoundError:
@@ -1025,7 +1098,7 @@ def run_trackeval(args: argparse.Namespace, verbose: bool = True) -> dict:
                 cfg = load_dataset_cfg(config_file.stem)
                 found = True
                 break
-        
+
         if not found:
             LOGGER.warning(f"Could not find dataset config for {cfg_name}. Class filtering might be incorrect.")
             cfg = {}
@@ -1049,7 +1122,7 @@ def run_trackeval(args: argparse.Namespace, verbose: bool = True) -> dict:
             if len(bench_classes) == 1:
                 single_class_mode = True
     # Priority 2: User provided classes
-    elif hasattr(args, 'classes') and args.classes is not None:
+    elif hasattr(args, "classes") and args.classes is not None:
         class_indices = args.classes if isinstance(args.classes, list) else [args.classes]
         user_classes = [COCO_CLASSES[int(i)] for i in class_indices]
         parsed_results = {k: v for k, v in parsed_results.items() if k in user_classes}
@@ -1057,25 +1130,25 @@ def run_trackeval(args: argparse.Namespace, verbose: bool = True) -> dict:
             single_class_mode = True
 
     if single_class_mode and len(parsed_results) > 0:
-        final_results = list(parsed_results.values())[0]
+        final_results = next(iter(parsed_results.values()))
     else:
         final_results = parsed_results
-    
+
     # Print results summary
     if verbose:
         LOGGER.info("")
-        LOGGER.opt(colors=True).info("<blue>" + "="*105 + "</blue>")
+        LOGGER.opt(colors=True).info("<blue>" + "=" * 105 + "</blue>")
         LOGGER.opt(colors=True).info(f"<bold><cyan>{'📊 RESULTS SUMMARY':^105}</cyan></bold>")
-        LOGGER.opt(colors=True).info("<blue>" + "="*105 + "</blue>")
-        
+        LOGGER.opt(colors=True).info("<blue>" + "=" * 105 + "</blue>")
+
         headers = ["Sequence", "HOTA", "MOTA", "IDF1", "AssA", "AssRe", "IDSW", "IDs"]
         header_str = "{:<25} {:>10} {:>10} {:>10} {:>10} {:>10} {:>10} {:>10}".format(*headers)
         LOGGER.opt(colors=True).info(f"<bold>{header_str}</bold>")
-        LOGGER.opt(colors=True).info("<blue>" + "-"*105 + "</blue>")
-        
+        LOGGER.opt(colors=True).info("<blue>" + "-" * 105 + "</blue>")
+
         for cls, class_metrics in parsed_results.items():
             # Print per-sequence metrics first
-            per_sequence = class_metrics.get('per_sequence', {})
+            per_sequence = class_metrics.get("per_sequence", {})
             for seq_name in sorted(per_sequence.keys()):
                 seq_metrics = per_sequence[seq_name]
                 name_col = f"{seq_name:<25}"
@@ -1086,13 +1159,13 @@ def run_trackeval(args: argparse.Namespace, verbose: bool = True) -> dict:
                     f"{seq_metrics.get('AssA', 0):>10.2f}",
                     f"{seq_metrics.get('AssRe', 0):>10.2f}",
                     f"{seq_metrics.get('IDSW', 0):>10}",
-                    f"{seq_metrics.get('IDs', 0):>10}"
+                    f"{seq_metrics.get('IDs', 0):>10}",
                 ]
                 vals_str = " ".join([f"<blue>{v}</blue>" for v in vals])
                 LOGGER.opt(colors=True).info(f"{name_col} {vals_str}")
-            
+
             # Print COMBINED row (bold, highlighted)
-            LOGGER.opt(colors=True).info("<blue>" + "-"*105 + "</blue>")
+            LOGGER.opt(colors=True).info("<blue>" + "-" * 105 + "</blue>")
             name_col = f"{'COMBINED (' + cls + ')':<25}"
             vals = [
                 f"{class_metrics.get('HOTA', 0):>10.2f}",
@@ -1101,36 +1174,36 @@ def run_trackeval(args: argparse.Namespace, verbose: bool = True) -> dict:
                 f"{class_metrics.get('AssA', 0):>10.2f}",
                 f"{class_metrics.get('AssRe', 0):>10.2f}",
                 f"{class_metrics.get('IDSW', 0):>10}",
-                f"{class_metrics.get('IDs', 0):>10}"
+                f"{class_metrics.get('IDs', 0):>10}",
             ]
             vals_str = " ".join([f"<cyan>{v}</cyan>" for v in vals])
             LOGGER.opt(colors=True).info(f"<bold>{name_col} {vals_str}</bold>")
-            
-        LOGGER.opt(colors=True).info("<blue>" + "="*105 + "</blue>")
+
+        LOGGER.opt(colors=True).info("<blue>" + "=" * 105 + "</blue>")
 
     if args.ci:
         with open(args.tracking_method + "_output.json", "w") as outfile:
             outfile.write(json.dumps(final_results))
-    
+
     return final_results
 
 
 def main(args):
     # Print evaluation pipeline header (blue palette)
     LOGGER.info("")
-    LOGGER.opt(colors=True).info("<blue>" + "="*60 + "</blue>")
+    LOGGER.opt(colors=True).info("<blue>" + "=" * 60 + "</blue>")
     LOGGER.opt(colors=True).info("<bold><cyan>🚀 BoxMOT Evaluation Pipeline</cyan></bold>")
-    LOGGER.opt(colors=True).info("<blue>" + "="*60 + "</blue>")
+    LOGGER.opt(colors=True).info("<blue>" + "=" * 60 + "</blue>")
     LOGGER.opt(colors=True).info(f"<bold>Detector:</bold>  <cyan>{args.yolo_model[0]}</cyan>")
     LOGGER.opt(colors=True).info(f"<bold>ReID:</bold>      <cyan>{args.reid_model[0]}</cyan>")
     LOGGER.opt(colors=True).info(f"<bold>Tracker:</bold>   <cyan>{args.tracking_method}</cyan>")
     LOGGER.opt(colors=True).info(f"<bold>Benchmark:</bold> <cyan>{args.source}</cyan>")
     LOGGER.opt(colors=True).info(f"<bold>Image size:</bold> <cyan>{getattr(args, 'imgsz', None)}</cyan>")
-    LOGGER.opt(colors=True).info("<blue>" + "="*60 + "</blue>")
-    
+    LOGGER.opt(colors=True).info("<blue>" + "=" * 60 + "</blue>")
+
     # Initialize timing stats for the evaluation pipeline
     timing_stats = TimingStats()
-    
+
     # Step 1: Download TrackEval
     LOGGER.opt(colors=True).info("<cyan>[1/4]</cyan> Setting up TrackEval...")
     eval_init(args)
@@ -1138,44 +1211,42 @@ def main(args):
     # Step 2: Generate detections and embeddings (with timing)
     LOGGER.opt(colors=True).info("<cyan>[2/4]</cyan> Generating detections and embeddings...")
     run_generate_dets_embs(args, timing_stats=timing_stats)
-    
+
     # Step 3: Generate MOT results (with tracking timing)
     LOGGER.opt(colors=True).info("<cyan>[3/4]</cyan> Running tracker...")
     run_generate_mot_results(args, timing_stats=timing_stats)
-    
+
     # Step 4: Evaluate with TrackEval
     LOGGER.opt(colors=True).info("<cyan>[4/4]</cyan> Evaluating results...")
     results = run_trackeval(args)
-    
+
     # Print timing summary if we collected timing data
     if timing_stats.frames > 0:
         timing_stats.print_summary()
-    
+
     # Only plot if we have results for a single class or handle multi-class plotting differently
     # For now, let's just skip the radar chart if we have multiple classes or complex structure
     # Or pick the first class found?
     # The original code expected a flat dict of metrics. Now we have {class: {metric: val}}
-    
+
     # Let's try to plot for each class or just skip for now to avoid breaking
     # If 'pedestrian' is in results, use that, otherwise use the first key
-    
+
     # Check if results is flat (single class backward compatibility) or nested
-    is_flat = False
-    if results and isinstance(list(results.values())[0], (int, float)):
-        is_flat = True
+    if results and isinstance(next(iter(results.values())), (int, float)):
         metrics_data = results
-        plot_class = 'single_class'
+        plot_class = "single_class"
     else:
-        plot_class = 'pedestrian'
+        plot_class = "pedestrian"
         if plot_class not in results and len(results) > 0:
-            plot_class = list(results.keys())[0]
+            plot_class = next(iter(results.keys()))
         metrics_data = results.get(plot_class, {})
 
     if metrics_data:
         plotter = MetricsPlotter(args.exp_dir)
-        
+
         # Filter only the metrics we want to plot
-        plot_metrics = ['HOTA', 'MOTA', 'IDF1']
+        plot_metrics = ["HOTA", "MOTA", "IDF1"]
         plot_values = [metrics_data.get(m, 0) for m in plot_metrics]
 
         plotter.plot_radar_chart(
@@ -1184,9 +1255,9 @@ def main(args):
             title=f"MOT metrics radar Chart ({plot_class})",
             ylim=(0, 100),
             yticks=[20, 40, 60, 80, 100],
-            ytick_labels=['20', '40', '60', '80', '100']
+            ytick_labels=["20", "40", "60", "80", "100"],
         )
-        
+
 
 if __name__ == "__main__":
     main()
