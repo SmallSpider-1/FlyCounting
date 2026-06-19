@@ -32,7 +32,7 @@ backbone:
 head:
   - [[2, 4, 6, 10], 1, SimFusion_4in, []] # 11
   - [-1, 1, IFM, [[64, 32]]] # 12
-   
+
   - [10, 1, Conv, [512, 1, 1]] # 13
   - [[4, 6, -1], 1, SimFusion_3in, [512]] # 14
   - [[-1, 12], 1, InjectionMultiSum_Auto_pool, [512, [64, 32], 0]] # 15
