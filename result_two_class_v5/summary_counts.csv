@@ -1,0 +1,13 @@
+video,class_id,class_name,start_region_count,end_region_count,frames,fps,global_frame_start,global_frame_end,combined_video,event_frames_dir
+08-41-24.mp4,0,Bactrocera correcta,0,11,194245,55.991,1,194245,,result_two_class_v5/event_frames
+08-41-24.mp4,1,Bactrocera dorsalis,0,32,194245,55.991,1,194245,,result_two_class_v5/event_frames
+09-41-28.mp4,0,Bactrocera correcta,11,12,201667,56.021,194246,395912,,result_two_class_v5/event_frames
+09-41-28.mp4,1,Bactrocera dorsalis,32,52,201667,56.021,194246,395912,,result_two_class_v5/event_frames
+10-41-29.mp4,0,Bactrocera correcta,12,23,201638,56.013,395913,597550,,result_two_class_v5/event_frames
+10-41-29.mp4,1,Bactrocera dorsalis,52,69,201638,56.013,395913,597550,,result_two_class_v5/event_frames
+11-41-30.mp4,0,Bactrocera correcta,23,44,201647,56.016,597551,799197,,result_two_class_v5/event_frames
+11-41-30.mp4,1,Bactrocera dorsalis,69,97,201647,56.016,597551,799197,,result_two_class_v5/event_frames
+12-41-30.mp4,0,Bactrocera correcta,44,52,134733,56.004,799198,933930,,result_two_class_v5/event_frames
+12-41-30.mp4,1,Bactrocera dorsalis,97,111,134733,56.004,799198,933930,,result_two_class_v5/event_frames
+13-36-17.mp4,0,Bactrocera correcta,52,52,7258,55.065,933931,941188,,result_two_class_v5/event_frames
+13-36-17.mp4,1,Bactrocera dorsalis,111,112,7258,55.065,933931,941188,,result_two_class_v5/event_frames

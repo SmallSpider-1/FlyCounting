@@ -1,0 +1,2 @@
+video,class_id,class_name,start_region_count,end_region_count,frames,fps,global_frame_start,global_frame_end,combined_video,event_frames_dir
+output.mp4,0,Bactrocera dorsalis,0,256,1563296,56.021,1,1563296,result_boxmot_one_class_219_optimized/combined_track_count.mp4,result_boxmot_one_class_219_optimized/event_frames

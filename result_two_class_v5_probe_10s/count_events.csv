@@ -1,0 +1,1 @@
+video,video_frame,global_frame,track_id,logical_track_id,cls_id,class_name,detected_cls_id,voted_cls_id,direction,delta,count_after,center_x,center_y,conf,stitched,stitch_gap_frames,event_reason,recovery_mode,occupancy_token_id,recovered_from_logical_id,recovery_score,recovery_track_class_id,recovery_class_match

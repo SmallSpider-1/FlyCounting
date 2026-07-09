@@ -1,0 +1,3 @@
+video,class_id,class_name,start_region_count,end_region_count,frames,fps,global_frame_start,global_frame_end,combined_video,event_frames_dir
+08-41-24.mp4,0,Bactrocera correcta,0,0,56,55.991,1,56,,result_two_class_v5_smoke/event_frames
+08-41-24.mp4,1,Bactrocera dorsalis,0,0,56,55.991,1,56,,result_two_class_v5_smoke/event_frames

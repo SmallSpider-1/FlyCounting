@@ -1,0 +1,2 @@
+video,class_id,class_name,start_region_count,end_region_count,frames,fps,global_frame_start,global_frame_end,combined_video,event_frames_dir
+16-20-44.mp4_fixed.mp4,0,Bactrocera dorsalis,0,130,287452,55.063,1,287452,/home/admin1/Projects/ultralytics-main/result_one_class_208_baseline_clean/combined_track_count.mp4,/home/admin1/Projects/ultralytics-main/result_one_class_208_baseline_clean/event_frames

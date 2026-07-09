@@ -1,0 +1,2 @@
+video,class_id,class_name,start_region_count,end_region_count,frames,fps,global_frame_start,global_frame_end,combined_video,event_frames_dir
+16-20-44.mp4_fixed.mp4,0,Bactrocera dorsalis,0,120,287452,55.063,1,287452,,result_one_class_208_v4/event_frames

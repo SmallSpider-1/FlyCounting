@@ -1,0 +1,13 @@
+video,class_id,class_name,start_region_count,end_region_count,frames,fps,global_frame_start,global_frame_end,combined_video,event_frames_dir
+08-41-24.mp4,0,Bactrocera correcta,0,21,194245,55.991,1,194245,result_two_class_v2/combined_track_count.mp4,result_two_class_v2/event_frames
+08-41-24.mp4,1,Bactrocera dorsalis,0,10,194245,55.991,1,194245,result_two_class_v2/combined_track_count.mp4,result_two_class_v2/event_frames
+09-41-28.mp4,0,Bactrocera correcta,21,29,201667,56.021,194246,395912,result_two_class_v2/combined_track_count.mp4,result_two_class_v2/event_frames
+09-41-28.mp4,1,Bactrocera dorsalis,10,18,201667,56.021,194246,395912,result_two_class_v2/combined_track_count.mp4,result_two_class_v2/event_frames
+10-41-29.mp4,0,Bactrocera correcta,29,44,201638,56.013,395913,597550,result_two_class_v2/combined_track_count.mp4,result_two_class_v2/event_frames
+10-41-29.mp4,1,Bactrocera dorsalis,18,21,201638,56.013,395913,597550,result_two_class_v2/combined_track_count.mp4,result_two_class_v2/event_frames
+11-41-30.mp4,0,Bactrocera correcta,44,88,201647,56.016,597551,799197,result_two_class_v2/combined_track_count.mp4,result_two_class_v2/event_frames
+11-41-30.mp4,1,Bactrocera dorsalis,21,26,201647,56.016,597551,799197,result_two_class_v2/combined_track_count.mp4,result_two_class_v2/event_frames
+12-41-30.mp4,0,Bactrocera correcta,88,108,134733,56.004,799198,933930,result_two_class_v2/combined_track_count.mp4,result_two_class_v2/event_frames
+12-41-30.mp4,1,Bactrocera dorsalis,26,27,134733,56.004,799198,933930,result_two_class_v2/combined_track_count.mp4,result_two_class_v2/event_frames
+13-36-17.mp4,0,Bactrocera correcta,108,108,7258,55.065,933931,941188,result_two_class_v2/combined_track_count.mp4,result_two_class_v2/event_frames
+13-36-17.mp4,1,Bactrocera dorsalis,27,27,7258,55.065,933931,941188,result_two_class_v2/combined_track_count.mp4,result_two_class_v2/event_frames

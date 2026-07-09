@@ -1,0 +1,51 @@
+/home/admin1/Projects/ultralytics-main/ultralytics/nn/extra_modules/ops_dcnv3/functions/dcnv3_func.py:26: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  def forward(
+/home/admin1/Projects/ultralytics-main/ultralytics/nn/extra_modules/ops_dcnv3/functions/dcnv3_func.py:62: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  def backward(ctx, grad_output):
+/home/admin1/Projects/ultralytics-main/ultralytics/nn/extra_modules/mobileMamba/csms6s.py:74: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  def forward(ctx, u, delta, A, B, C, D=None, delta_bias=None, delta_softplus=False, oflex=True, backend=None):
+/home/admin1/Projects/ultralytics-main/ultralytics/nn/extra_modules/mobileMamba/csms6s.py:91: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  def backward(ctx, dout, *args):
+/home/admin1/Projects/ultralytics-main/ultralytics/nn/extra_modules/semnet.py:139: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  @autocast(enabled=False)
+/home/admin1/Projects/ultralytics-main/ultralytics/nn/extra_modules/GroupMamba/csms6s.py:327: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  def forward(ctx, u, delta, A, B, C, D=None, delta_bias=None, delta_softplus=False, nrows=1, backnrows=1, oflex=True):
+/home/admin1/Projects/ultralytics-main/ultralytics/nn/extra_modules/GroupMamba/csms6s.py:335: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  def backward(ctx, dout, *args):
+/home/admin1/Projects/ultralytics-main/ultralytics/nn/extra_modules/GroupMamba/csms6s.py:350: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  def forward(ctx, u, delta, A, B, C, D=None, delta_bias=None, delta_softplus=False, nrows=1, backnrows=1, oflex=True):
+/home/admin1/Projects/ultralytics-main/ultralytics/nn/extra_modules/GroupMamba/csms6s.py:358: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  def backward(ctx, dout, *args):
+/home/admin1/Projects/ultralytics-main/ultralytics/nn/extra_modules/GroupMamba/csms6s.py:371: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  def forward(ctx, u, delta, A, B, C, D=None, delta_bias=None, delta_softplus=False, nrows=1, backnrows=1, oflex=True):
+/home/admin1/Projects/ultralytics-main/ultralytics/nn/extra_modules/GroupMamba/csms6s.py:379: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  def backward(ctx, dout, *args):
+/home/admin1/Projects/ultralytics-main/ultralytics/nn/extra_modules/TinyVIM.py:163: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  @torch.cuda.amp.custom_fwd(cast_inputs=torch.float32)
+/home/admin1/Projects/ultralytics-main/ultralytics/nn/extra_modules/TinyVIM.py:194: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  def backward(ctx, dout, *args):
+/home/admin1/Projects/ultralytics-main/ultralytics/nn/extra_modules/mamba_yolo.py:105: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  def forward(ctx, u, delta, A, B, C, D=None, delta_bias=None, delta_softplus=False, nrows=1, backnrows=1,
+/home/admin1/Projects/ultralytics-main/ultralytics/nn/extra_modules/mamba_yolo.py:132: FutureWarning: `torch.cuda.amp.custom_bwd(args...)` is deprecated. Please use `torch.amp.custom_bwd(args..., device_type='cuda')` instead.
+  def backward(ctx, dout, *args):
+模型权重: yolo8n_two-class.pt
+视频目录: video_data/two-class_79_27
+输出目录: result_two_class_79_27_v5
+合并视频: disabled
+视频数量: 7
+YOLOv8 summary (fused): 73 layers, 3,006,038 parameters, 0 gradients, 8.1 GFLOPs
+[mov,mp4,m4a,3gp,3g2,mj2 @ 0x5a7d7544a700] moov atom not found
+计数优化: band=15.0px, stitch_gap=28帧, stitch_distance=80.0px, stitch_score=0.60, recovery_gap=6帧, recovery_score=0.40, recovery_class_scores={0: 0.6, 1: 0.97}, recovery_class_match=False, recovery_class_match_required={1}, band_start_recovery=False, outer_start_recovery=True, reentry_cooldown=0帧, class_weights={0: 0.18, 1: 1.0}, entry_detected_override={1}
+完成: 04-42-21.mp4，帧数: 42272，连续区域计数: {0: 0, 1: 13}
+完成: 06-30-07.mp4，帧数: 181936，连续区域计数: {0: 0, 1: 28}
+完成: 07-29-05.mp4，帧数: 260267，连续区域计数: {0: 3, 1: 38}
+Traceback (most recent call last):
+  File "/home/admin1/Projects/ultralytics-main/main.py", line 692, in <module>
+    main()
+  File "/home/admin1/Projects/ultralytics-main/main.py", line 608, in main
+    process_video(
+  File "/home/admin1/Projects/ultralytics-main/main.py", line 377, in process_video
+    input_size, fps, _ = get_video_info(video_path)
+  File "/home/admin1/Projects/ultralytics-main/main.py", line 162, in get_video_info
+    raise RuntimeError(f"无法打开视频: {video_path}")
+RuntimeError: 无法打开视频: video_data/two-class_79_27/08-49-53.mp4
