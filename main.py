@@ -18,7 +18,7 @@ warnings.filterwarnings("ignore")
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_VIDEO_DIR = ROOT / "two_class_61_118"
-DEFAULT_OUTPUT_DIR = ROOT / "result_boxmot"
+DEFAULT_OUTPUT_DIR = ROOT / "project_results" / "result_boxmot"
 
 
 def load_boxmot_bytetrack():
@@ -85,8 +85,6 @@ def parse_args():
     parser.add_argument("--device", default="0", help="推理设备，例如 0、cpu。")
     parser.add_argument("--half", action="store_true", help="使用 FP16 半精度推理，CUDA 上通常更快。")
     parser.add_argument("--classes", default="", help="只跟踪指定类别，逗号分隔；默认不过滤。")
-    parser.add_argument("--max-frames", type=int, default=0, help="最多处理多少帧，0 表示不限制；主要用于快速测试。")
-    parser.add_argument("--max-seconds", type=float, default=0, help="最多处理合并视频的多少秒，0 表示不限制。")
     parser.add_argument("--sync-write", action="store_true", help="同步写视频/图片；默认异步写出以提高速度。")
     parser.add_argument("--save-raw-event", action="store_true", help="同时保存未标注的事件帧。")
     return parser.parse_args()
@@ -338,11 +336,6 @@ def process_video(model, video_path, args, class_names, combined_writer, image_s
     segment_start_global_frame = global_state["frame"] + 1
 
     while True:
-        if global_state["max_frames"] and global_state["frame"] >= global_state["max_frames"]:
-            break
-        if args.max_frames and video_frame_index >= args.max_frames:
-            break
-
         ret, frame = cap.read()
         if not ret:
             break
@@ -472,10 +465,6 @@ def main():
     print(f"输出目录: {args.output}")
     print(f"合并视频: {combined_video}")
     print(f"视频数量: {len(videos)}")
-    max_global_frames = int(round(first_fps * args.max_seconds)) if args.max_seconds else 0
-    if max_global_frames:
-        print(f"测试截断: {args.max_seconds:g} 秒，约 {max_global_frames} 帧")
-
     model = YOLO(str(weights))
     try:
         model.fuse()
@@ -486,12 +475,10 @@ def main():
     region_counts = defaultdict(int)
     event_rows = []
     segment_rows = []
-    global_state = {"frame": 0, "max_frames": max_global_frames}
+    global_state = {"frame": 0}
 
     try:
         for video_path in videos:
-            if global_state["max_frames"] and global_state["frame"] >= global_state["max_frames"]:
-                break
             process_video(
                 model,
                 video_path,

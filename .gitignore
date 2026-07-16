@@ -208,10 +208,22 @@ data/
 
 # Custom: tracking results and output directories
 results_track_count/
-result_boxmot_*/
+result_boxmot*/
+result_counting_preview/
+result_counting_cache/
+result_counting_ablation/
+result_two_class_*/
 video_data/
 dataset/
 ppt制作/
 findings.md
 progress.md
 task_plan.md
+paper/
+research_docs/
+
+# Keep the small historical BoxMOT CSV summaries after grouping project results.
+!project_results/result_boxmot_one_class_219_yolo26n/
+!project_results/result_boxmot_one_class_219_yolo26n/*.csv
+!project_results/result_boxmot_two_class_61_118_yolo8n/
+!project_results/result_boxmot_two_class_61_118_yolo8n/*.csv
