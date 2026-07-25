@@ -11,11 +11,14 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-ROOT = Path(__file__).resolve().parent
+# 本脚本已归档至 legacy/scripts/，ROOT 仍指向仓库根目录。
+ROOT = Path(__file__).resolve().parents[2]
+LEGACY_DIR = Path(__file__).resolve().parents[1]
 
 # 以后切换模型时，只需要修改这一行。
 MODEL_NAME = "yolo12"
-DATASET_PATH = ROOT / "dataset_two_class.yaml"
+# 注意：这份数据配置的类别顺序与现行定义相反，详见 legacy/README.md。
+DATASET_PATH = LEGACY_DIR / "configs/dataset_two_class.yaml"
 RUNS_DIR = ROOT / "runs/detect"
 
 MODEL_CONFIGS = {

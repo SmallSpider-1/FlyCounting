@@ -26,9 +26,11 @@ warnings.filterwarnings("ignore")
 
 DEFAULT_VIDEO_DIR = ROOT / "video_data"
 DEFAULT_OUTPUT_DIR = ROOT / "project_results" / "detection_cache"
+# 与 datasets/fruitfly_detection_v1/metadata/classes.yaml 的
+# canonical_yolo_and_deim_rtdetr_ids 保持一致。
 DEFAULT_NAMES = {
-    0: "Bactrocera correcta",
-    1: "Bactrocera dorsalis",
+    0: "Bactrocera dorsalis",
+    1: "Bactrocera correcta",
 }
 VIDEO_SUFFIXES = {".mp4", ".avi", ".mov", ".mkv", ".wmv", ".flv", ".m4v"}
 
@@ -75,19 +77,12 @@ def resolve_weights(weights):
             raise FileNotFoundError(f"模型权重不存在: {weights}")
         return weights
 
-    candidates = [ROOT / "best.pt"]
-    candidates.extend(
-        sorted(
-            (ROOT / "runs/detect").glob("**/weights/best.pt"),
-            key=lambda path: path.stat().st_mtime,
-            reverse=True,
-        )
+    # 不再隐式回落到 legacy/weights/ 下的历史权重：那些权重的类别顺序与现行
+    # 定义相反，静默选中会产出物种对调但不报错的缓存。详见 legacy/README.md。
+    raise FileNotFoundError(
+        "必须使用 --weights 显式指定冻结后的 .pt 文件；"
+        "不要使用 legacy/weights/ 下的历史权重（类别顺序与现行定义相反）。"
     )
-    candidates.extend((ROOT / "yolo8n_two-class.pt", ROOT / "yolo26n.pt"))
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    raise FileNotFoundError("没有找到模型权重，请使用 --weights 指定冻结后的 .pt 文件。")
 
 
 def iter_videos(source):
@@ -130,8 +125,34 @@ def parse_classes(classes_text):
 def get_class_names(model):
     names = getattr(model, "names", None) or DEFAULT_NAMES
     if isinstance(names, dict):
-        return {int(key): str(value) for key, value in names.items()}
-    return {index: str(name) for index, name in enumerate(names)}
+        resolved = {int(key): str(value) for key, value in names.items()}
+    else:
+        resolved = {index: str(name) for index, name in enumerate(names)}
+    check_class_order(resolved)
+    return resolved
+
+
+def check_class_order(class_names):
+    """拒绝类别顺序与现行统一定义冲突的权重。
+
+    下游按物种名字符串匹配真值，若权重的 class ID 与 canonical 定义对调，
+    整条链路不会报错，只会得到两个物种数值互换的结果。详见 legacy/README.md。
+    """
+    conflicts = [
+        (class_id, name, DEFAULT_NAMES[class_id])
+        for class_id, name in sorted(class_names.items())
+        if class_id in DEFAULT_NAMES and name != DEFAULT_NAMES[class_id]
+    ]
+    if conflicts:
+        detail = "；".join(
+            f"class {class_id} 权重为 {actual}，应为 {expected}"
+            for class_id, actual, expected in conflicts
+        )
+        raise ValueError(
+            f"权重的类别顺序与现行统一定义冲突：{detail}。"
+            "现行定义见 datasets/fruitfly_detection_v1/metadata/classes.yaml；"
+            "legacy/weights/ 下的历史权重顺序相反，不能直接用于生成缓存。"
+        )
 
 
 def detections_from_results(results):

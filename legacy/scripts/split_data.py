@@ -2,11 +2,15 @@ import os
 import shutil
 import random
 
+# 本脚本已归档，不再参与当前实验链路，详见 legacy/README.md。
+# 现行数据划分已固化在 datasets/fruitfly_detection_v1/ 并有指纹校验，不应再随机重划。
+# 以下为相对路径，如需运行必须从仓库根目录执行。
+
 # ================= 配置参数 =================
 # 原始数据集所在路径 (请确保路径正确)
-src_dir = 'data'  
+src_dir = 'data'
 # 划分后的数据集保存路径
-out_dir = 'dataset' 
+out_dir = 'dataset'
 
 # 划分比例: 训练集 80%, 验证集 10%, 测试集 10%
 train_ratio = 0.8
