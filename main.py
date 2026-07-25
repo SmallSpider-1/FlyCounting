@@ -381,7 +381,7 @@ def process_video(model, video_path, args, class_names, combined_writer, image_s
 
             if delta:
                 count_cls_id = track_class_state.get(track_id, cls_id) if delta < 0 else cls_id
-                region_counts[count_cls_id] = max(0, region_counts[count_cls_id] + delta)
+                region_counts[count_cls_id] += delta
                 event = {
                     "video": video_path.name,
                     "video_frame": video_frame_index,
