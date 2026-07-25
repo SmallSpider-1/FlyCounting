@@ -1,0 +1,147 @@
+schema_version: 1
+generated_at: "2026-07-25T14:28:51+08:00"
+benchmark_root: /home/admin1/Projects/ultralytics-main/tracking_model_benchmark
+
+projects:
+  sort:
+    project_dir: 01_sort
+    official_repo: https://github.com/abewley/sort.git
+    commit: 2236dff5019565958b84df7d871d41cc1db58ac7
+    conda_env: bench_tracking
+    env_origin: new
+    python_version: "3.9.23"
+    pytorch_version: "2.0.1+cu118"
+    torchvision_version: "0.15.2+cu118"
+    cuda_runtime: "11.8"
+    cuda_available: true
+    core_import: true
+    tracker_construct: true
+    synthetic_update: true
+    smoke_log: 01_sort/logs/smoke_test.log
+    validation_status: READY_SMOKE
+    environment_notes: "Independent bench_tracking environment. Native SORT has no ReID or GMC; one tracker consumed the combined detection stream (per_class=false), and two synthetic frames retained one ID."
+  bytetrack:
+    project_dir: 02_bytetrack
+    official_repo: https://github.com/ifzhang/ByteTrack.git
+    commit: d1bf0191adff59bc8fcfeaa0b33d3d1642552a99
+    conda_env: bench_tracking
+    env_origin: new
+    python_version: "3.9.23"
+    pytorch_version: "2.0.1+cu118"
+    torchvision_version: "0.15.2+cu118"
+    cuda_runtime: "11.8"
+    cuda_available: true
+    core_import: true
+    tracker_construct: true
+    synthetic_update: true
+    smoke_log: 02_bytetrack/logs/smoke_test.log
+    validation_status: READY_SMOKE
+    environment_notes: "Official ByteTrack core passed with lap/loguru/cython-bbox and pinned NumPy 1.23.5. Native mode is no-ReID/no-GMC; the class column was not split (per_class=false)."
+  ocsort:
+    project_dir: 03_ocsort
+    official_repo: https://github.com/noahcao/OC_SORT.git
+    commit: 8462e7e729a93ccd3bd995c0a79a890336cb3a0b
+    conda_env: bench_tracking
+    env_origin: new
+    python_version: "3.9.23"
+    pytorch_version: "2.0.1+cu118"
+    torchvision_version: "0.15.2+cu118"
+    cuda_runtime: "11.8"
+    cuda_available: true
+    core_import: true
+    tracker_construct: true
+    synthetic_update: true
+    smoke_log: 03_ocsort/logs/smoke_test.log
+    validation_status: READY_SMOKE
+    environment_notes: "Official pure-motion OCSort path passed with filterpy. ReID, GMC, interpolation/future-frame logic and offline post-processing were not used; per_class=false."
+  sfsort:
+    project_dir: 04_sfsort
+    official_repo: https://github.com/gitmehrdad/SFSORT.git
+    commit: b1abdeca5ee361c59a20a7fa3937e830846eea82
+    conda_env: bench_tracking
+    env_origin: new
+    python_version: "3.9.23"
+    pytorch_version: "2.0.1+cu118"
+    torchvision_version: "0.15.2+cu118"
+    cuda_runtime: "11.8"
+    cuda_available: true
+    core_import: true
+    tracker_construct: true
+    synthetic_update: true
+    smoke_log: 04_sfsort/logs/smoke_test.log
+    validation_status: READY_SMOKE
+    environment_notes: "Official online SFSORT core passed without weights. The smoke used no ReID, no GMC, no future frames/offline post-processing and one combined class stream (per_class=false)."
+  fasttracker:
+    project_dir: 05_fasttracker
+    official_repo: https://github.com/ultralytics/ultralytics.git
+    source_path: /home/admin1/Projects/ultralytics-main/ultralytics/trackers
+    upstream_tag: v8.4.105
+    commit: a7e7e65a3e4086c5d2104dca06f6593564eda1ae
+    local_base_commit: b06fe71473c5541c2bfa06222e30ce4db379b4f9
+    conda_env: bench_tracking
+    env_origin: new
+    python_version: "3.9.23"
+    pytorch_version: "2.0.1+cu118"
+    torchvision_version: "0.15.2+cu118"
+    cuda_runtime: "11.8"
+    cuda_available: true
+    core_import: true
+    tracker_construct: true
+    synthetic_update: true
+    smoke_log: 05_fasttracker/logs/smoke_test.log
+    validation_status: READY_SMOKE
+    environment_notes: "Ultralytics no-appearance adaptation pinned to official v8.4.105, including later association/index fixes. Its v8.4.105 ByteTrack base is isolated in fasttracker_byte_tracker.py so the local v8.4.20 ByteTrack/BoT-SORT paths remain unchanged. No encoder, GMC, ECC or optical flow exists; per_class=false passed."
+  boosttrack:
+    project_dir: 06_boosttrack
+    official_repo: https://github.com/vukasin-stanojevic/BoostTrack.git
+    commit: fb5bfc3a8f067476565e753b3a73df4d757c9d03
+    conda_env: bench_tracking
+    env_origin: new
+    python_version: "3.9.23"
+    pytorch_version: "2.0.1+cu118"
+    torchvision_version: "0.15.2+cu118"
+    cuda_runtime: "11.8"
+    cuda_available: true
+    core_import: true
+    tracker_construct: true
+    synthetic_update: true
+    smoke_log: 06_boosttrack/logs/smoke_test.log
+    validation_status: READY_SMOKE
+    environment_notes: "Formal ablation sets use_embedding=false and use_ecc=false; smoke confirmed embedder=None and ecc=None with no weights. The unchanged module still imports torchreid/gdown at import time, so those packages are registered but never invoked. No offline interpolation and per_class=false."
+  hybridsort:
+    project_dir: 07_hybridsort
+    official_repo: https://github.com/ymzis69/HybridSORT.git
+    commit: 396f8d30db13304c0cbaf1dcf2e16ded93ce1701
+    conda_env: bench_tracking
+    env_origin: new
+    python_version: "3.9.23"
+    pytorch_version: "2.0.1+cu118"
+    torchvision_version: "0.15.2+cu118"
+    cuda_runtime: "11.8"
+    cuda_available: true
+    core_import: true
+    tracker_construct: true
+    synthetic_update: true
+    smoke_log: 07_hybridsort/logs/smoke_test.log
+    validation_status: READY_SMOKE
+    environment_notes: "Official pure-motion Hybrid_Sort (not Hybrid_Sort_ReID) passed with ECC=false, hybrid_sort_with_reid=false and with_fastreid=false. No interpolation/future frames; per_class=false."
+  botsort:
+    project_dir: 08_botsort
+    official_repo: https://github.com/NirAharon/BoT-SORT.git
+    commit: 251985436d6712aaf682aaaf5f71edb4987224bd
+    conda_env: bench_tracking
+    env_origin: new
+    python_version: "3.9.23"
+    pytorch_version: "2.0.1+cu118"
+    torchvision_version: "0.15.2+cu118"
+    cuda_runtime: "11.8"
+    cuda_available: true
+    core_import: true
+    tracker_construct: true
+    synthetic_update: true
+    smoke_log: 08_botsort/logs/smoke_test.log
+    validation_status: READY_SMOKE_WITH_IMPORT_SHIM
+    environment_notes: "Formal ablation sets with_reid=false and cmc_method=none; smoke confirmed no encoder and identity GMC. Official vendored FastReID imports torch._six, removed in PyTorch 2.0, so the external smoke entry injects only string_classes=(str,); src remains clean and ReID is never constructed. No interpolation and per_class=false."
+
+shared_environment_groups:
+  bench_tracking: [sort, bytetrack, ocsort, sfsort, fasttracker, boosttrack, hybridsort, botsort]

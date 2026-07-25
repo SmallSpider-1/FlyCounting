@@ -1,0 +1,16 @@
+{
+  "det_thresh": 0.6,
+  "dlo_boost_coef": 0.65,
+  "iou_threshold": 0.3,
+  "lambda_iou": 0.5,
+  "lambda_mhd": 0.25,
+  "lambda_shape": 0.25,
+  "max_age": 30,
+  "metadata_match_iou": 0.1,
+  "min_hits": 3,
+  "use_dlo_boost": true,
+  "use_duo_boost": true,
+  "use_rich_s": true,
+  "use_sb": true,
+  "use_vt": true
+}

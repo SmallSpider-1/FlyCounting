@@ -1,0 +1,7 @@
+{
+  "match_thresh": 0.9,
+  "metadata_match_iou": 0.1,
+  "mot20": false,
+  "track_buffer": 30,
+  "track_thresh": 0.6
+}

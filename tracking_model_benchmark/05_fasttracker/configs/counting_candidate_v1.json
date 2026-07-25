@@ -1,0 +1,17 @@
+{
+  "active_occ_to_lost_thresh": 10,
+  "dampen_motion_occ": 0.5,
+  "enlarge_bbox_occ": 1.1,
+  "fuse_score": true,
+  "init_iou_suppress": 0.7,
+  "match_thresh": 0.8,
+  "metadata_match_iou": 0.1,
+  "new_track_thresh": 0.25,
+  "occ_cover_thresh": 0.7,
+  "occ_reappear_window": 40,
+  "reset_pos_offset_occ": 3,
+  "reset_velocity_offset_occ": 5,
+  "track_buffer": 30,
+  "track_high_thresh": 0.25,
+  "track_low_thresh": 0.1
+}

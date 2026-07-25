@@ -1,0 +1,6 @@
+{
+  "iou_threshold": 0.3,
+  "max_age": 1,
+  "metadata_match_iou": 0.1,
+  "min_hits": 3
+}

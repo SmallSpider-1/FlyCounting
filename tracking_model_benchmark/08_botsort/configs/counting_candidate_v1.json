@@ -1,0 +1,11 @@
+{
+  "appearance_thresh": 0.25,
+  "match_thresh": 0.8,
+  "metadata_match_iou": 0.1,
+  "mot20": false,
+  "new_track_thresh": 0.7,
+  "proximity_thresh": 0.5,
+  "track_buffer": 30,
+  "track_high_thresh": 0.6,
+  "track_low_thresh": 0.1
+}

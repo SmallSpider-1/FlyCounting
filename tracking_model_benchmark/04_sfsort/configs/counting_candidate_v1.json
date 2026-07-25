@@ -1,0 +1,13 @@
+{
+  "central_timeout": 0,
+  "dynamic_tuning": false,
+  "high_th": 0.6,
+  "horizontal_margin_ratio": 0.0,
+  "low_th": 0.1,
+  "marginal_timeout": 0,
+  "match_th_first": 0.67,
+  "match_th_second": 0.3,
+  "metadata_match_iou": 0.1,
+  "new_track_th": 0.7,
+  "vertical_margin_ratio": 0.0
+}

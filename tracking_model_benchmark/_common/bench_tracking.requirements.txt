@@ -1,0 +1,13 @@
+# Import/runtime dependencies missing from the read-only bench_detection_torch201 baseline.
+# Cython must be installed before cython-bbox; create_shared_environment.sh enforces that order.
+Cython==0.29.37
+cython-bbox==0.1.5
+filterpy==1.4.5
+lap==0.5.12
+loguru==0.7.3
+faiss-cpu==1.7.4
+gdown==4.7.1
+beautifulsoup4==4.15.0
+soupsieve==2.8.4
+PySocks==1.7.1
+torchreid==0.2.5

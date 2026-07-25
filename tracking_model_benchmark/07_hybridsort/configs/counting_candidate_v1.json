@@ -1,0 +1,16 @@
+{
+  "TCM_byte_step": true,
+  "TCM_byte_step_weight": 1.0,
+  "TCM_first_step": true,
+  "TCM_first_step_weight": 1.0,
+  "asso_func": "Height_Modulated_IoU",
+  "delta_t": 3,
+  "det_thresh": 0.6,
+  "inertia": 0.05,
+  "iou_threshold": 0.25,
+  "max_age": 30,
+  "metadata_match_iou": 0.1,
+  "min_hits": 3,
+  "track_thresh": 0.6,
+  "use_byte": true
+}
