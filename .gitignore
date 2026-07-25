@@ -226,8 +226,6 @@ task_plan.md
 paper/
 research_docs/
 
-# Keep the small historical BoxMOT CSV summaries after grouping project results.
-!project_results/result_boxmot_one_class_219_yolo26n/
-!project_results/result_boxmot_one_class_219_yolo26n/*.csv
-!project_results/result_boxmot_two_class_61_118_yolo8n/
-!project_results/result_boxmot_two_class_61_118_yolo8n/*.csv
+# Generated benchmark outputs stay out of source control; retain only the layout guide.
+project_results/*
+!project_results/README.md
