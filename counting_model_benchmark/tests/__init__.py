@@ -1,0 +1,1 @@
+"""Counting benchmark regression tests."""

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "name": "baseline_circle_v1",
+  "reference_frame_size": [2304, 1296],
+  "reference_center": [1185, 732],
+  "reference_radius": 215,
+  "count_point": "bbox_center",
+  "enter_transition": ["outside", "inside"],
+  "enter_delta": 1,
+  "exit_transition": ["inside", "outside"],
+  "exit_delta": -1,
+  "first_observation_creates_event": false,
+  "clamp_negative_counts": false
+}
