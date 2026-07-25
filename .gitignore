@@ -224,7 +224,10 @@ findings.md
 progress.md
 task_plan.md
 paper/
-research_docs/
+# 研究文档是纯文本交接材料，必须纳入版本控制；此前整目录被忽略，
+# 导致新建的文档被静默排除、无法从任何提交恢复。只忽略非 .md 产物。
+research_docs/*
+!research_docs/*.md
 
 # Generated benchmark outputs stay out of source control; retain only the layout guide.
 project_results/*
