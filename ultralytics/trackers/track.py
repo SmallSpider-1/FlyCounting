@@ -10,9 +10,10 @@ from ultralytics.utils.checks import check_yaml
 
 from .bot_sort import BOTSORT
 from .byte_tracker import BYTETracker
+from .fast_tracker import FASTTracker
 
 # A mapping of tracker types to corresponding tracker classes
-TRACKER_MAP = {"bytetrack": BYTETracker, "botsort": BOTSORT}
+TRACKER_MAP = {"bytetrack": BYTETracker, "botsort": BOTSORT, "fasttrack": FASTTracker}
 
 
 def on_predict_start(predictor: object, persist: bool = False) -> None:
@@ -36,8 +37,8 @@ def on_predict_start(predictor: object, persist: bool = False) -> None:
     tracker = check_yaml(predictor.args.tracker)
     cfg = IterableSimpleNamespace(**YAML.load(tracker))
 
-    if cfg.tracker_type not in {"bytetrack", "botsort"}:
-        raise AssertionError(f"Only 'bytetrack' and 'botsort' are supported for now, but got '{cfg.tracker_type}'")
+    if cfg.tracker_type not in TRACKER_MAP:
+        raise AssertionError(f"Only {sorted(TRACKER_MAP)} are supported for now, but got '{cfg.tracker_type}'")
 
     predictor._feats = None  # reset in case used earlier
     if hasattr(predictor, "_hook"):
@@ -60,7 +61,8 @@ def on_predict_start(predictor: object, persist: bool = False) -> None:
 
     trackers = []
     for _ in range(predictor.dataset.bs):
-        tracker = TRACKER_MAP[cfg.tracker_type](args=cfg, frame_rate=30)
+        tracker_cls = TRACKER_MAP[cfg.tracker_type]
+        tracker = tracker_cls(args=cfg) if cfg.tracker_type == "fasttrack" else tracker_cls(args=cfg, frame_rate=30)
         trackers.append(tracker)
         if predictor.dataset.mode != "stream":  # only need one tracker for other modes
             break
