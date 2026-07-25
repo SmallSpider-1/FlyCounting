@@ -1,0 +1,7 @@
+video_id,directory_name,dorsalis_gt,correcta_gt,segment_count,duration_seconds,frame_count,size_bytes,aggregation_mode,tracker_boundary_policy,segment_order_status,truth_version,split
+LV001,dorsalis_132-correcta_0,132,0,1,26925.856615,1508416,18811734724,sum_segment_counts,reset_each_segment,single_file,v1,unassigned
+LV002,dorsalis_208-correcta_0,208,0,1,26304.822995,1448496,30036842478,sum_segment_counts,reset_each_segment,single_file,v1,unassigned
+LV003,dorsalis_236-correcta_0,236,0,5,40193.192300,2248584,44295614392,sum_segment_counts,reset_each_segment,filename_order_plus_legacy_group,v1,unassigned
+LV004,dorsalis_244-correcta_0,244,0,5,37479.156660,2074782,26679255865,sum_segment_counts,reset_each_segment,filename_order_plus_legacy_group,v1,unassigned
+LV005,dorsalis_61-correcta_118,61,118,6,16806.314254,941188,20497598199,sum_segment_counts,reset_each_segment,time_like_filename_order,v1,unassigned
+LV006,dorsalis_79-correcta_27,79,27,7,32077.579236,1785593,34680163055,sum_segment_counts,reset_each_segment,deterministic_not_chronologically_verified,v1,unassigned

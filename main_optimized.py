@@ -29,7 +29,7 @@ warnings.filterwarnings("ignore")
 
 
 ROOT = Path(__file__).resolve().parent
-DEFAULT_VIDEO_DIR = ROOT / "two_class_61_118"
+DEFAULT_VIDEO_DIR = ROOT / "video_data" / "dorsalis_61-correcta_118"
 DEFAULT_OUTPUT_DIR = ROOT / "project_results" / "result_boxmot"
 
 

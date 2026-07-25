@@ -1,0 +1,14 @@
+video_id,subgroup_id,segment_indices,legacy_source_group,dorsalis_count,correcta_count,truth_scope,use,status
+LV001,LV001-SG01,1,one_class_132,132,0,file,diagnostic_and_directory_total,user_confirmed
+LV002,LV002-SG01,1,one_class_208,208,0,file,diagnostic_and_directory_total,user_confirmed
+LV003,LV003-SG01,1-4,dorsalis_17,17,0,segment_group,diagnostic_only,retained_from_legacy_directory_name
+LV003,LV003-SG02,5,one_class_219_2025916,219,0,file,diagnostic_only,retained_from_legacy_directory_name
+LV004,LV004-SG01,1-4,dorsalis_25,25,0,segment_group,diagnostic_only,retained_from_legacy_directory_name
+LV004,LV004-SG02,5,one_class_219_2025915,219,0,file,diagnostic_only,retained_from_legacy_directory_name
+LV005,LV005-SG01,1-6,two_class_61_118,61,118,segment_group,diagnostic_and_directory_total,user_confirmed
+LV006,LV006-SG01,1-2,two-class_11_8,11,8,segment_group,diagnostic_only,retained_from_legacy_directory_name
+LV006,LV006-SG02,3,two-class_4_3,4,3,file,diagnostic_only,retained_from_legacy_filename
+LV006,LV006-SG03,4,two-class_5_6,5,6,file,diagnostic_only,retained_from_legacy_filename
+LV006,LV006-SG04,5,two-class_6_1,6,1,file,diagnostic_only,retained_from_legacy_filename
+LV006,LV006-SG05,6,two-class_15_2,15,2,file,diagnostic_only,retained_from_legacy_filename
+LV006,LV006-SG06,7,two-class_38_7,38,7,file,diagnostic_only,retained_from_legacy_filename

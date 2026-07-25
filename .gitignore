@@ -214,6 +214,10 @@ result_counting_cache/
 result_counting_ablation/
 result_two_class_*/
 video_data/
+!video_data/
+video_data/*
+!video_data/manifests/
+!video_data/manifests/**
 dataset/
 ppt制作/
 findings.md

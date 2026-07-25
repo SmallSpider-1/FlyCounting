@@ -1,0 +1,7 @@
+video_id,capture_batch,split,split_version,status,notes
+LV001,LV001,unassigned,v1,not_frozen,awaiting_grouped_development_validation_test_design
+LV002,LV002,unassigned,v1,not_frozen,awaiting_grouped_development_validation_test_design
+LV003,LV003,unassigned,v1,not_frozen,awaiting_grouped_development_validation_test_design
+LV004,LV004,unassigned,v1,not_frozen,awaiting_grouped_development_validation_test_design
+LV005,LV005,unassigned,v1,not_frozen,has_historical_engineering_results
+LV006,LV006,unassigned,v1,not_frozen,contains_clips_used_for_engineering_diagnostics

@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STRATEGY="${1:-b0_baseline}"
-SOURCE_DIR="${2:-${ROOT_DIR}/video_data/two-class_79_27}"
+SOURCE_DIR="${2:-${ROOT_DIR}/video_data/dorsalis_79-correcta_27}"
 OUTPUT_ROOT="${3:-${ROOT_DIR}/project_results/result_counting_ablation}"
 DEVICE="${4:-0}"
 WEIGHTS="${5:-${ROOT_DIR}/yolo8n_two-class.pt}"
