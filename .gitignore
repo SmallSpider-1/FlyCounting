@@ -232,3 +232,13 @@ research_docs/*
 # Generated benchmark outputs stay out of source control; retain only the layout guide.
 project_results/*
 !project_results/README.md
+
+# Detection benchmark code, configs, runbooks, environment manifests, and
+# pipeline scripts belong in Git. Ignore only bulky/reproducible local
+# material: upstream source clones, model binaries, logs, and run outputs.
+/detection_model_benchmark/*/src/
+/detection_model_benchmark/*/weights/
+/detection_model_benchmark/*/logs/
+/detection_model_benchmark/_logs/
+/detection_model_benchmark/results/
+/detection_model_benchmark/_common/dataset_paths.env

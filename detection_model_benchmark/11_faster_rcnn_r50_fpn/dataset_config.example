@@ -1,0 +1,10 @@
+# Values consumed by RUNBOOK.md/train_custom.py; the official reference loader reads COCO paths directly.
+dataset_format: COCO
+dataset_root: /path/to/final/coco_dataset
+train_images: /path/to/final/coco_dataset/train2017
+val_images: /path/to/final/coco_dataset/val2017
+train_annotations: /path/to/final/coco_dataset/annotations/instances_train2017.json
+val_annotations: /path/to/final/coco_dataset/annotations/instances_val2017.json
+num_foreground_classes: 2
+category_ids: TO_BE_CONFIRMED_AND_REMAP_TO_CONTIGUOUS_1_TO_2
+class_names: TO_BE_CONFIRMED

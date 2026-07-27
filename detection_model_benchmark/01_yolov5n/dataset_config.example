@@ -1,0 +1,7 @@
+# Copy to dataset_config.yaml only after the final split and class order are frozen.
+path: /path/to/final/yolo_dataset
+train: images/train
+val: images/val
+test: images/test
+nc: 2
+names: [TO_BE_CONFIRMED_CLASS_0, TO_BE_CONFIRMED_CLASS_1]

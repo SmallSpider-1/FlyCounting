@@ -1,0 +1,31 @@
+# Shared, compatibility-constrained runtime for YOLOv5/7/9/10, DEIM-D-FINE-N and RT-DETR-R18.
+# PyTorch and torchvision are installed separately from the official PyTorch CUDA 11.8 index.
+numpy==1.23.5
+opencv-python==4.9.0.80
+pillow==10.4.0
+PyYAML==6.0.1
+scipy==1.13.0
+pandas==2.0.3
+matplotlib==3.7.5
+seaborn==0.13.2
+tqdm>=4.66.3
+requests>=2.32.2
+urllib3>=2.6.0
+psutil==5.9.8
+py-cpuinfo==9.0.0
+gitpython>=3.1.30
+thop>=0.1.1
+ipython
+protobuf==4.21.2
+tensorboard
+albumentations==1.3.1
+pycocotools==2.0.7
+onnx==1.14.0
+onnxruntime-gpu==1.18.0
+onnxslim==0.1.31
+huggingface-hub==0.23.2
+safetensors==0.4.3
+transformers==4.41.2
+faster-coco-eval>=1.6.5
+calflops
+ultralytics==8.4.98

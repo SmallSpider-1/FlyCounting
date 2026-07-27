@@ -1,0 +1,37 @@
+# Copy to src/configs/dataset/fruitfly_detection.yml after COCO paths and category mapping are frozen.
+task: detection
+evaluator:
+  type: CocoEvaluator
+  iou_types: [bbox]
+num_classes: 2
+remap_mscoco_category: false
+train_dataloader:
+  type: DataLoader
+  dataset:
+    type: CocoDetection
+    img_folder: /path/to/final/coco_dataset/train
+    ann_file: /path/to/final/coco_dataset/annotations/instances_train.json
+    return_masks: false
+    transforms:
+      type: Compose
+      ops: null
+  shuffle: true
+  num_workers: TO_BE_CONFIRMED
+  drop_last: true
+  collate_fn:
+    type: BatchImageCollateFunction
+val_dataloader:
+  type: DataLoader
+  dataset:
+    type: CocoDetection
+    img_folder: /path/to/final/coco_dataset/val
+    ann_file: /path/to/final/coco_dataset/annotations/instances_val.json
+    return_masks: false
+    transforms:
+      type: Compose
+      ops: null
+  shuffle: false
+  num_workers: TO_BE_CONFIRMED
+  drop_last: false
+  collate_fn:
+    type: BatchImageCollateFunction

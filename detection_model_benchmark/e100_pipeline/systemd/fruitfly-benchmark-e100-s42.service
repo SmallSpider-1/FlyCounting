@@ -1,0 +1,19 @@
+[Unit]
+Description=Fruit-fly 11-model e100 benchmark scheduler
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=/home/admin1/Projects/ultralytics-main
+ExecStart=/home/admin1/.conda/envs/bench_detection_torch201/bin/python /home/admin1/Projects/ultralytics-main/detection_model_benchmark/e100_pipeline/scheduler_daemon.py
+Restart=on-failure
+RestartSec=10
+KillMode=control-group
+TimeoutStopSec=60
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=append:/home/admin1/Projects/ultralytics-main/detection_model_benchmark/results/fruitfly_detection_v1/benchmark_640_e100_s42/scheduler/systemd_service.log
+StandardError=append:/home/admin1/Projects/ultralytics-main/detection_model_benchmark/results/fruitfly_detection_v1/benchmark_640_e100_s42/scheduler/systemd_service.log
+
+[Install]
+WantedBy=default.target

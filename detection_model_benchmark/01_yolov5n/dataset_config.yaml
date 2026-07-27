@@ -1,0 +1,9 @@
+# Frozen unified C/R1/R2 benchmark dataset.
+path: /home/admin1/Projects/ultralytics-main/datasets/fruitfly_detection_v1/yolo
+train: images/train
+val: images/val
+test: images/test
+nc: 2
+names:
+  0: Bactrocera dorsalis
+  1: Bactrocera correcta

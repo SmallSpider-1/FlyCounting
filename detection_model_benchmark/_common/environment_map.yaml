@@ -1,0 +1,208 @@
+schema_version: 1
+generated_at: "2026-07-17T17:31:00+08:00"
+benchmark_root: /home/admin1/Projects/ultralytics-main/detection_model_benchmark
+
+projects:
+  yolov5n:
+    project_dir: 01_yolov5n
+    official_repo: https://github.com/ultralytics/yolov5.git
+    conda_env: bench_detection_torch201
+    env_origin: new
+    python_version: "3.9.23"
+    pytorch_version: "2.0.1+cu118"
+    torchvision_version: "0.15.2+cu118"
+    cuda_runtime: "11.8"
+    cuda_available: true
+    weight_path: 01_yolov5n/weights/yolov5n.pt
+    weight_sha256: 4f180cf23ba0717ada0badd6c685026d73d48f184d00fc159c2641284b2ac0a3
+    core_import: true
+    weight_load: true
+    single_image_inference: true
+    smoke_log: 01_yolov5n/logs/smoke_test.log
+    validation_status: READY
+    environment_notes: "No existing environment satisfied current YOLOv5 dependencies without modification; shares one new compatibility-pinned environment."
+  yolov7_tiny:
+    project_dir: 02_yolov7_tiny
+    official_repo: https://github.com/WongKinYiu/yolov7.git
+    conda_env: bench_detection_torch201
+    env_origin: new
+    python_version: "3.9.23"
+    pytorch_version: "2.0.1+cu118"
+    torchvision_version: "0.15.2+cu118"
+    cuda_runtime: "11.8"
+    cuda_available: true
+    weight_path: 02_yolov7_tiny/weights/yolov7-tiny.pt
+    weight_sha256: 0fa1423606133c06362ec716029dade1169d5631e83195b75d8efa66d2ee0b77
+    core_import: true
+    weight_load: true
+    single_image_inference: true
+    smoke_log: 02_yolov7_tiny/logs/smoke_test.log
+    validation_status: READY
+    environment_notes: "Existing CUDA environments used NumPy versions incompatible with the official NumPy<1.24 constraint or lacked required training dependencies."
+  yolov8n:
+    project_dir: 03_yolov8n
+    official_repo: https://github.com/ultralytics/ultralytics.git
+    conda_env: yolov26
+    env_origin: existing
+    python_version: "3.10.20"
+    pytorch_version: "2.6.0+cu124"
+    torchvision_version: "0.21.0+cu124"
+    cuda_runtime: "12.4"
+    cuda_available: true
+    weight_path: 03_yolov8n/weights/yolov8n.pt
+    weight_sha256: f59b3d833e2ff32e194b5bb8e08d211dc7c5bdf144b90d2c8412c47ccfc83b36
+    core_import: true
+    weight_load: true
+    single_image_inference: true
+    smoke_log: 03_yolov8n/logs/smoke_test.log
+    validation_status: READY
+    environment_notes: "Directly reused without package changes; local source commit v8.4.98 was imported through PYTHONPATH."
+  yolov9_t:
+    project_dir: 04_yolov9_t
+    official_repo: https://github.com/WongKinYiu/yolov9.git
+    conda_env: bench_detection_torch201
+    env_origin: new
+    python_version: "3.9.23"
+    pytorch_version: "2.0.1+cu118"
+    torchvision_version: "0.15.2+cu118"
+    cuda_runtime: "11.8"
+    cuda_available: true
+    weight_path: 04_yolov9_t/weights/yolov9-t-converted.pt
+    weight_sha256: 61e080e964e65e32b884477c5e6344c607c7e02103d64649de810edaeb869803
+    core_import: true
+    weight_load: true
+    single_image_inference: true
+    smoke_log: 04_yolov9_t/logs/smoke_test.log
+    validation_status: READY
+    environment_notes: "No existing environment had the complete YOLOv9 training dependency set without modification."
+  yolov10n:
+    project_dir: 05_yolov10n
+    official_repo: https://github.com/THU-MIG/yolov10.git
+    conda_env: bench_detection_torch201
+    env_origin: new
+    python_version: "3.9.23"
+    pytorch_version: "2.0.1+cu118"
+    torchvision_version: "0.15.2+cu118"
+    cuda_runtime: "11.8"
+    cuda_available: true
+    weight_path: 05_yolov10n/weights/yolov10n.pt
+    weight_sha256: 61b91ffc99b284792dca49bf40216945833cc2a515e1a742954e6e9327cfc19e
+    core_import: true
+    weight_load: true
+    single_image_inference: true
+    smoke_log: 05_yolov10n/logs/smoke_test.log
+    validation_status: READY
+    environment_notes: "Official torch==2.0.1/torchvision==0.15.2 pins were absent from directly reusable existing environments."
+  yolo11n:
+    project_dir: 06_yolo11n
+    official_repo: https://github.com/ultralytics/ultralytics.git
+    conda_env: yolov26
+    env_origin: existing
+    python_version: "3.10.20"
+    pytorch_version: "2.6.0+cu124"
+    torchvision_version: "0.21.0+cu124"
+    cuda_runtime: "12.4"
+    cuda_available: true
+    weight_path: 06_yolo11n/weights/yolo11n.pt
+    weight_sha256: 0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1
+    core_import: true
+    weight_load: true
+    single_image_inference: true
+    smoke_log: 06_yolo11n/logs/smoke_test.log
+    validation_status: READY
+    environment_notes: "Directly reused without package changes; shares the same Ultralytics source commit as YOLOv8n and YOLO26n."
+  yolo12n:
+    project_dir: 07_yolo12n
+    official_repo: https://github.com/sunsmarterjie/yolov12.git
+    conda_env: yolov26
+    env_origin: existing
+    python_version: "3.10.20"
+    pytorch_version: "2.6.0+cu124"
+    torchvision_version: "0.21.0+cu124"
+    cuda_runtime: "12.4"
+    cuda_available: true
+    weight_path: 07_yolo12n/weights/yolov12n.pt
+    weight_sha256: 37080c2891b94c62998f0bfb552dd70c32f9f2ee36618b9e7b3da49b49e150ac
+    core_import: true
+    weight_load: true
+    single_image_inference: true
+    smoke_log: 07_yolo12n/logs/smoke_test.log
+    validation_status: READY
+    environment_notes: "Direct GPU inference passed using the official scaled_dot_product_attention fallback; flash-attn is not installed."
+  yolo26n:
+    project_dir: 08_yolo26n
+    official_repo: https://github.com/ultralytics/ultralytics.git
+    conda_env: yolov26
+    env_origin: existing
+    python_version: "3.10.20"
+    pytorch_version: "2.6.0+cu124"
+    torchvision_version: "0.21.0+cu124"
+    cuda_runtime: "12.4"
+    cuda_available: true
+    weight_path: 08_yolo26n/weights/yolo26n.pt
+    weight_sha256: 9b09cc8bf347f0fc8a5f7657480587f25db09b34bf33b0652110fb03a8ad4fef
+    core_import: true
+    weight_load: true
+    single_image_inference: true
+    smoke_log: 08_yolo26n/logs/smoke_test.log
+    validation_status: READY
+    environment_notes: "Directly reused without package changes."
+  deim_dfine_n:
+    project_dir: 09_deim_dfine_n
+    official_repo: https://github.com/Intellindust-AI-Lab/DEIM.git
+    conda_env: bench_detection_torch201
+    env_origin: new
+    python_version: "3.9.23"
+    pytorch_version: "2.0.1+cu118"
+    torchvision_version: "0.15.2+cu118"
+    cuda_runtime: "11.8"
+    cuda_available: true
+    weight_path: 09_deim_dfine_n/weights/deim_dfine_hgnetv2_n_coco_160e.pth
+    weight_sha256: 8536a97a57bad2951cb4679e8578be225e4a19db678ab568a44e538f4f0fc917
+    core_import: true
+    weight_load: true
+    single_image_inference: true
+    smoke_log: 09_deim_dfine_n/logs/smoke_test.log
+    validation_status: READY
+    environment_notes: "Existing environments lacked transformers, faster-coco-eval and other required packages; verified with the DEIM wrapper config, not plain D-FINE-N."
+  rt_detr_r18:
+    project_dir: 10_rt_detr_r18
+    official_repo: https://github.com/lyuwenyu/RT-DETR.git
+    conda_env: bench_detection_torch201
+    env_origin: new
+    python_version: "3.9.23"
+    pytorch_version: "2.0.1+cu118"
+    torchvision_version: "0.15.2+cu118"
+    cuda_runtime: "11.8"
+    cuda_available: true
+    weight_path: 10_rt_detr_r18/weights/rtdetr_r18vd_dec3_6x_coco_from_paddle.pth
+    weight_sha256: 3ba8b5c909c9a1c4f21e96d0a7251ab1a485093955ca327d0061fef8d33c66f0
+    core_import: true
+    weight_load: true
+    single_image_inference: true
+    smoke_log: 10_rt_detr_r18/logs/smoke_test.log
+    validation_status: READY
+    environment_notes: "Verified the original PyTorch RT-DETR-R18 config; not RT-DETR-L, RT-DETRv2-S or RT-DETRv3-R18."
+  faster_rcnn_r50_fpn:
+    project_dir: 11_faster_rcnn_r50_fpn
+    official_repo: https://github.com/pytorch/vision.git
+    conda_env: pointnext
+    env_origin: existing
+    python_version: "3.10.20"
+    pytorch_version: "2.6.0+cu124"
+    torchvision_version: "0.21.0+cu124"
+    cuda_runtime: "12.4"
+    cuda_available: true
+    weight_path: 11_faster_rcnn_r50_fpn/weights/fasterrcnn_resnet50_fpn_coco-258fb6c6.pth
+    weight_sha256: 258fb6c638b15964ddcdd1ae0748c5eef1be9e732750120cc857feed3faac384
+    core_import: true
+    weight_load: true
+    single_image_inference: true
+    smoke_log: 11_faster_rcnn_r50_fpn/logs/smoke_test.log
+    validation_status: READY
+    environment_notes: "Directly reused without package changes; official references/detection training entry import also passed."
+
+shared_environment_groups:
+  bench_detection_torch201: [yolov5n, yolov7_tiny, yolov9_t, yolov10n, deim_dfine_n, rt_detr_r18]
+  yolov26: [yolov8n, yolo11n, yolo12n, yolo26n]
+  pointnext: [faster_rcnn_r50_fpn]

@@ -1,0 +1,30 @@
+# Copy to src/rtdetr_pytorch/configs/dataset/fruitfly_detection.yml after COCO paths and categories are frozen.
+task: detection
+num_classes: 2
+remap_mscoco_category: false
+train_dataloader:
+  type: DataLoader
+  dataset:
+    type: CocoDetection
+    img_folder: /path/to/final/coco_dataset/train
+    ann_file: /path/to/final/coco_dataset/annotations/instances_train.json
+    transforms:
+      type: Compose
+      ops: null
+  shuffle: true
+  batch_size: TO_BE_CONFIRMED
+  num_workers: TO_BE_CONFIRMED
+  drop_last: true
+val_dataloader:
+  type: DataLoader
+  dataset:
+    type: CocoDetection
+    img_folder: /path/to/final/coco_dataset/val
+    ann_file: /path/to/final/coco_dataset/annotations/instances_val.json
+    transforms:
+      type: Compose
+      ops: null
+  shuffle: false
+  batch_size: TO_BE_CONFIRMED
+  num_workers: TO_BE_CONFIRMED
+  drop_last: false

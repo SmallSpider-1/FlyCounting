@@ -1,0 +1,30 @@
+# Batch size is a provisional loader default; freeze the common training protocol before formal runs.
+task: detection
+num_classes: 2
+remap_mscoco_category: false
+train_dataloader:
+  type: DataLoader
+  dataset:
+    type: CocoDetection
+    img_folder: /home/admin1/Projects/ultralytics-main/datasets/fruitfly_detection_v1/coco/train
+    ann_file: /home/admin1/Projects/ultralytics-main/datasets/fruitfly_detection_v1/coco/annotations/instances_train.json
+    transforms:
+      type: Compose
+      ops: null
+  shuffle: true
+  batch_size: 8
+  num_workers: 8
+  drop_last: false
+val_dataloader:
+  type: DataLoader
+  dataset:
+    type: CocoDetection
+    img_folder: /home/admin1/Projects/ultralytics-main/datasets/fruitfly_detection_v1/coco/val
+    ann_file: /home/admin1/Projects/ultralytics-main/datasets/fruitfly_detection_v1/coco/annotations/instances_val.json
+    transforms:
+      type: Compose
+      ops: null
+  shuffle: false
+  batch_size: 8
+  num_workers: 8
+  drop_last: false

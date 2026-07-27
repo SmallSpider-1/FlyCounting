@@ -1,0 +1,19 @@
+[Unit]
+Description=Fruit-fly YOLOv10n e100 standalone recovery worker
+After=default.target
+Conflicts=fruitfly-benchmark-e100-s42.service
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+WorkingDirectory=/home/admin1/Projects/ultralytics-main
+ExecStart=/home/admin1/.conda/envs/bench_detection_torch201/bin/python /home/admin1/Projects/ultralytics-main/detection_model_benchmark/e100_pipeline/train_worker.py --model yolov10n --physical-gpu 1
+Restart=on-failure
+RestartSec=15
+KillMode=control-group
+TimeoutStopSec=120
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target
