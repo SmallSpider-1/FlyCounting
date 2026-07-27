@@ -1,13 +1,27 @@
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 
 
-CACHE_VERSION = 1
+CACHE_VERSION = 2
 CACHE_FIELDS = {
     "detections": ["x1", "y1", "x2", "y2", "confidence", "class_id"],
     "tracks": ["x1", "y1", "x2", "y2", "track_id", "confidence", "class_id", "detection_index"],
+}
+
+# 写入时按字段固定小数位，避免不同 NumPy/设备产生的浮点尾数差异改变 payload 哈希。
+# 精度为 0 的字段本身就是整数语义，直接写成 int。
+FIELD_DECIMALS = {
+    "x1": 2,
+    "y1": 2,
+    "x2": 2,
+    "y2": 2,
+    "confidence": 4,
+    "track_id": 0,
+    "class_id": 0,
+    "detection_index": 0,
 }
 
 
@@ -19,6 +33,28 @@ def file_signature(path):
         "size": int(stat.st_size),
         "mtime_ns": int(stat.st_mtime_ns),
     }
+
+
+def quantize_value(value, decimals, field, frame_index):
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError(f"数值缓存不接受非有限数值: frame={frame_index}, field={field}, value={value!r}")
+    if decimals == 0:
+        rounded = math.floor(abs(number) + 0.5)
+        result = int(math.copysign(rounded, number)) if rounded else 0
+        if abs(number - result) > 1e-6:
+            raise ValueError(
+                f"数值缓存整数字段收到非整数值: frame={frame_index}, field={field}, value={value!r}"
+            )
+        return result
+    scale = 10**decimals
+    # 固定“四舍五入远离零”，不使用 Python round 的银行家进位，保证跨平台一致。
+    scaled = math.floor(abs(number) * scale + 0.5)
+    return math.copysign(scaled, number) / scale if scaled else 0.0
+
+
+def quantize_row(row, fields, frame_index):
+    return [quantize_value(value, FIELD_DECIMALS[field], field, frame_index) for value, field in zip(row, fields)]
 
 
 def stable_hash(value):
@@ -45,6 +81,7 @@ class NumericCacheWriter:
             "cache_version": CACHE_VERSION,
             "kind": kind,
             "fields": CACHE_FIELDS[kind],
+            "field_decimals": {field: FIELD_DECIMALS[field] for field in CACHE_FIELDS[kind]},
             **metadata,
         }
         self.cache_id = stable_hash(core_header)
@@ -63,8 +100,10 @@ class NumericCacheWriter:
         expected_columns = len(self.header["fields"])
         if not isinstance(rows, list) or any(not isinstance(row, list) or len(row) != expected_columns for row in rows):
             raise ValueError(f"数值缓存数据列数不匹配: 期望每行 {expected_columns} 列")
+        fields = self.header["fields"]
+        quantized = [quantize_row(row, fields, frame_index) for row in rows]
         key = "d" if self.header["kind"] == "detections" else "t"
-        record = {"f": int(frame_index), key: rows}
+        record = {"f": int(frame_index), key: quantized}
         self.handle.write(json.dumps(record, ensure_ascii=False, separators=(",", ":"), allow_nan=False) + "\n")
         self.frames_written += 1
 
@@ -106,6 +145,9 @@ def read_cache_header(path, expected_kind=None):
         raise ValueError(f"数值缓存类型无效: {path}, kind={kind!r}")
     if header.get("fields") != CACHE_FIELDS[kind]:
         raise ValueError(f"数值缓存字段定义不兼容: {path}")
+    expected_decimals = {field: FIELD_DECIMALS[field] for field in CACHE_FIELDS[kind]}
+    if header.get("field_decimals") != expected_decimals:
+        raise ValueError(f"数值缓存精度策略不兼容: {path}")
     if expected_kind is not None and kind != expected_kind:
         raise ValueError(f"数值缓存类型不匹配: 期望 {expected_kind}，实际 {header.get('kind')}")
     header_without_id = {key: value for key, value in header.items() if key != "cache_id"}

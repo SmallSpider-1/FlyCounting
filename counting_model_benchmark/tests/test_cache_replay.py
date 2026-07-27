@@ -4,7 +4,14 @@ import unittest
 from collections import defaultdict
 from pathlib import Path
 
-from benchmark_common.numeric_cache import NumericCacheWriter, iter_cache_frames, read_cache_header
+from benchmark_common.numeric_cache import (
+    CACHE_FIELDS,
+    CACHE_VERSION,
+    FIELD_DECIMALS,
+    NumericCacheWriter,
+    iter_cache_frames,
+    read_cache_header,
+)
 from counting_model_benchmark.counting_core import (
     REFERENCE_CIRCLE_CENTER,
     REFERENCE_CIRCLE_RADIUS,
@@ -44,9 +51,10 @@ class TestNumericCache(unittest.TestCase):
             path = Path(temp_dir) / "incomplete.tracks.jsonl"
             metadata = cache_metadata()
             header_without_id = {
-                "cache_version": 1,
+                "cache_version": CACHE_VERSION,
                 "kind": "tracks",
                 "fields": ["x1", "y1", "x2", "y2", "track_id", "confidence", "class_id", "detection_index"],
+                "field_decimals": {field: FIELD_DECIMALS[field] for field in CACHE_FIELDS["tracks"]},
                 **metadata,
             }
             from benchmark_common.numeric_cache import stable_hash
@@ -58,6 +66,37 @@ class TestNumericCache(unittest.TestCase):
             )
             with self.assertRaisesRegex(ValueError, "未完整写出"):
                 list(iter_cache_frames(path, "tracks"))
+
+    def test_float_noise_below_precision_keeps_identical_payload(self):
+        """同一四舍五入区间内的浮点尾数差异不改变缓存字节。
+
+        注意：截断只吸收区间内的噪声。若两次推理的数值正好落在 .xx5 分界线两侧，
+        仍会写出不同结果，因此不能据此声称跨环境哈希必然一致。协议要求的
+        “同一环境重跑哈希一致”依赖的是推理本身逐位确定，而不是这里的截断。
+        """
+        rows_a = [[1184.521999, 731.090001, 1205.331999, 752.870001, 0.9311999678611755, 1]]
+        rows_b = [[1184.522001, 731.089999, 1205.332001, 752.869999, 0.9312000021338463, 1]]
+        payloads = []
+        with tempfile.TemporaryDirectory() as temp_dir:
+            for name, rows in (("a", rows_a), ("b", rows_b)):
+                path = Path(temp_dir) / f"{name}.detections.jsonl"
+                writer = NumericCacheWriter(path, "detections", cache_metadata())
+                writer.write_frame(1, rows)
+                writer.close()
+                payloads.append(path.read_bytes())
+            self.assertEqual(payloads[0], payloads[1])
+            self.assertEqual(
+                list(iter_cache_frames(path, "detections")),
+                [(1, [[1184.52, 731.09, 1205.33, 752.87, 0.9312, 1]])],
+            )
+
+    def test_non_integer_id_field_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "badclass.detections.jsonl"
+            writer = NumericCacheWriter(path, "detections", cache_metadata())
+            with self.assertRaisesRegex(ValueError, "整数字段收到非整数值"):
+                writer.write_frame(1, [[1, 2, 3, 4, 0.9, 0.5]])
+            writer.abort()
 
     def test_missing_frame_is_rejected(self):
         with tempfile.TemporaryDirectory() as temp_dir:
