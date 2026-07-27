@@ -1,6 +1,6 @@
 # Detection model benchmark workspace
 
-Created on 2026-07-17 for reproducible two-class fruit-fly detection comparisons across controlled scene C, real complex-background R1, and real black-background R2. Source, environments, official pretrained weights, and smoke tests were prepared first; on 2026-07-18 the user-provided normalized C/R1/R2 splits were materialized as `fruitfly_detection_v1` and wired into all 11 project directories. No model training has been started.
+Created on 2026-07-17 for reproducible two-class fruit-fly detection comparisons across controlled scene C, real complex-background R1, and real black-background R2. Source, environments, official pretrained weights, and smoke tests were prepared first; on 2026-07-18 the user-provided normalized C/R1/R2 splits were materialized as `fruitfly_detection_v1` and wired into all 11 project directories. The unified e100 benchmark has since completed; current research status and conclusions are maintained in `research_docs/当前进展与下一步.md`.
 
 ## Shared long-video detection cache
 
@@ -9,6 +9,13 @@ counting pipeline. It recursively preserves logical-video directories and writes
 the common `Nx6 [xyxy, confidence, class_id]` JSONL format defined in
 `benchmark_common/numeric_cache.py`. It does not run tracking, counting, or ROI
 optimization.
+
+The frozen RT-DETR-R18 uses the separate official-source backend
+`rtdetr_r18_backend.py` and the manifest-driven entry
+`cache_rtdetr_detections.py`. Before generating or replacing a formal detector
+cache, read [`DETECTION_CACHE_HANDOFF.md`](DETECTION_CACHE_HANDOFF.md). It records
+the reusable backend contract, validation gates, exact RT-DETR commands, first-run
+evidence, and the checklist for adding another detector.
 
 ## Status summary
 
