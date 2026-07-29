@@ -1,13 +1,21 @@
 {
-  "central_timeout": 0,
-  "dynamic_tuning": false,
+  "central_timeout": {
+    "fps_ratio": 1.0
+  },
+  "cth": 0.5,
+  "dynamic_tuning": true,
   "high_th": 0.6,
-  "horizontal_margin_ratio": 0.0,
+  "high_th_m": 0.1,
+  "horizontal_margin_ratio": 0.1,
   "low_th": 0.1,
-  "marginal_timeout": 0,
+  "marginal_timeout": {
+    "fps_ratio": 0.7
+  },
   "match_th_first": 0.67,
-  "match_th_second": 0.3,
+  "match_th_first_m": 0.05,
+  "match_th_second": 0.2,
   "metadata_match_iou": 0.1,
   "new_track_th": 0.7,
-  "vertical_margin_ratio": 0.0
+  "new_track_th_m": 0.08,
+  "vertical_margin_ratio": 0.1
 }

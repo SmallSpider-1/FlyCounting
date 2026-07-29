@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import sys
 import types
+from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
@@ -61,16 +62,20 @@ DEFAULT_CONFIGS = {
         "metadata_match_iou": 0.1,
     },
     "sfsort": {
+        "dynamic_tuning": True,
+        "cth": 0.5,
         "high_th": 0.6,
+        "high_th_m": 0.1,
         "match_th_first": 0.67,
-        "new_track_th": 0.7,
+        "match_th_first_m": 0.05,
+        "match_th_second": 0.2,
         "low_th": 0.1,
-        "match_th_second": 0.3,
-        "dynamic_tuning": False,
-        "marginal_timeout": 0,
-        "central_timeout": 0,
-        "horizontal_margin_ratio": 0.0,
-        "vertical_margin_ratio": 0.0,
+        "new_track_th": 0.7,
+        "new_track_th_m": 0.08,
+        "marginal_timeout": {"fps_ratio": 0.7},
+        "central_timeout": {"fps_ratio": 1.0},
+        "horizontal_margin_ratio": 0.1,
+        "vertical_margin_ratio": 0.1,
         "metadata_match_iou": 0.1,
     },
     "fasttracker": {
@@ -143,7 +148,19 @@ def resolved_config(tracker_name: str, overrides: dict | None = None) -> dict:
     unknown = set(overrides) - set(DEFAULT_CONFIGS[tracker_name])
     if unknown:
         raise ValueError(f"{tracker_name} 配置包含未知字段: {sorted(unknown)}")
-    return {**DEFAULT_CONFIGS[tracker_name], **overrides}
+    return {**deepcopy(DEFAULT_CONFIGS[tracker_name]), **deepcopy(overrides)}
+
+
+def resolve_sfsort_timeout(value, fps: float, field: str) -> int:
+    if not isinstance(value, dict) or set(value) != {"fps_ratio"}:
+        raise ValueError(
+            f"SF-SORT {field} 必须使用 {{'fps_ratio': ...}} 按片段 FPS 动态解析，"
+            f"不接受固定帧数: {value!r}"
+        )
+    ratio = float(value["fps_ratio"])
+    if ratio < 0:
+        raise ValueError(f"SF-SORT {field}.fps_ratio 不能为负数: {ratio}")
+    return int(ratio * fps)
 
 
 def enter_source(project: str, *extra_paths: Path) -> Path:
@@ -231,9 +248,20 @@ class OfficialTrackerAdapter(UnifiedTrackerAdapter):
             sfsort_config.update(
                 frame_width=width,
                 frame_height=height,
-                horizontal_margin=int(round(width * horizontal_ratio)),
-                vertical_margin=int(round(height * vertical_ratio)),
+                marginal_timeout=resolve_sfsort_timeout(
+                    sfsort_config["marginal_timeout"],
+                    self.geometry.fps,
+                    "marginal_timeout",
+                ),
+                central_timeout=resolve_sfsort_timeout(
+                    sfsort_config["central_timeout"],
+                    self.geometry.fps,
+                    "central_timeout",
+                ),
+                horizontal_margin=int(width * horizontal_ratio),
+                vertical_margin=int(height * vertical_ratio),
             )
+            self.config = sfsort_config
             return SFSORT(sfsort_config)
         if self.tracker_name == "fasttracker":
             os.chdir(ROOT)

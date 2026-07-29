@@ -23,6 +23,12 @@ from counting_model_benchmark.counting_core import (
 
 COUNTING_ROOT = Path(__file__).resolve().parent
 DEFAULT_COUNTING_CONFIG = COUNTING_ROOT / "configs" / "baseline_circle_v1.json"
+OUTPUT_FILENAMES = (
+    "final_counts.csv",
+    "count_events.csv",
+    "segment_summary.csv",
+    "replay_config.csv",
+)
 
 
 def parse_args():
@@ -33,13 +39,7 @@ def parse_args():
     parser.add_argument("--center-x", type=float, default=None, help="覆盖配置中的参考圆心 x。")
     parser.add_argument("--center-y", type=float, default=None, help="覆盖配置中的参考圆心 y。")
     parser.add_argument("--radius", type=float, default=None, help="覆盖配置中的参考半径。")
-    parser.add_argument(
-        "--initial-count",
-        action="append",
-        default=[],
-        metavar="CLASS_ID=COUNT",
-        help="可重复指定初始瓶内数量，例如 --initial-count 0=2。",
-    )
+    parser.add_argument("--overwrite", action="store_true", help="显式允许覆盖本目录已有的四个计数 CSV。")
     return parser.parse_args()
 
 
@@ -96,15 +96,17 @@ def resolve_track_caches(source):
     return caches
 
 
-def parse_initial_counts(values):
-    counts = defaultdict(int)
-    for value in values:
-        try:
-            class_text, count_text = value.split("=", 1)
-            counts[int(class_text)] = int(count_text)
-        except ValueError as exc:
-            raise ValueError(f"无效 --initial-count: {value}，应为 CLASS_ID=COUNT") from exc
-    return counts
+def prepare_output_directory(output: Path, overwrite: bool) -> Path:
+    output = output.resolve()
+    conflicts = [output / name for name in OUTPUT_FILENAMES if (output / name).exists()]
+    if conflicts and not overwrite:
+        paths = "\n".join(f"  - {path}" for path in conflicts)
+        raise FileExistsError(
+            f"计数输出文件已存在，拒绝静默覆盖:\n{paths}\n"
+            "如需覆盖，请显式传入 --overwrite。"
+        )
+    output.mkdir(parents=True, exist_ok=True)
+    return output
 
 
 def write_csv(path, fieldnames, rows):
@@ -197,9 +199,8 @@ def main():
     if radius <= 0:
         raise ValueError("--radius 必须大于 0。")
     caches = resolve_track_caches(args.tracks)
-    args.output.mkdir(parents=True, exist_ok=True)
-    region_counts = parse_initial_counts(args.initial_count)
-    initial_counts = dict(region_counts)
+    output_root = prepare_output_directory(args.output, args.overwrite)
+    region_counts = defaultdict(int)
     event_rows = []
     segment_rows = []
     all_class_names = {}
@@ -229,7 +230,7 @@ def main():
             all_class_names[class_id] = class_name
 
     write_csv(
-        args.output / "count_events.csv",
+        output_root / "count_events.csv",
         [
             "cache",
             "video",
@@ -248,7 +249,7 @@ def main():
         event_rows,
     )
     write_csv(
-        args.output / "segment_summary.csv",
+        output_root / "segment_summary.csv",
         [
             "cache",
             "video",
@@ -267,9 +268,10 @@ def main():
         ],
         segment_rows,
     )
-    class_ids = sorted(set(all_class_names) | set(region_counts) | set(initial_counts))
+    class_ids = sorted(set(all_class_names) | set(region_counts))
+    initial_counts = {class_id: 0 for class_id in class_ids}
     write_csv(
-        args.output / "final_counts.csv",
+        output_root / "final_counts.csv",
         ["class_id", "class_name", "final_region_count"],
         [
             {
@@ -281,7 +283,7 @@ def main():
         ],
     )
     write_csv(
-        args.output / "replay_config.csv",
+        output_root / "replay_config.csv",
         [
             "track_caches",
             "counting_config",
@@ -289,6 +291,7 @@ def main():
             "reference_center_x",
             "reference_center_y",
             "reference_radius",
+            "initial_count_policy",
             "initial_counts",
         ],
         [
@@ -299,11 +302,12 @@ def main():
                 "reference_center_x": center_x,
                 "reference_center_y": center_y,
                 "reference_radius": radius,
+                "initial_count_policy": "fixed_zero_per_class",
                 "initial_counts": "|".join(f"{key}={value}" for key, value in sorted(initial_counts.items())),
             }
         ],
     )
-    print(f"计数重放完成：{len(caches)} 个轨迹缓存，{len(event_rows)} 个跨界事件，输出 {args.output}")
+    print(f"计数重放完成：{len(caches)} 个轨迹缓存，{len(event_rows)} 个跨界事件，输出 {output_root}")
 
 
 if __name__ == "__main__":
