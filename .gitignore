@@ -242,3 +242,6 @@ project_results/*
 /detection_model_benchmark/_logs/
 /detection_model_benchmark/results/
 /detection_model_benchmark/_common/dataset_paths.env
+
+
+video_test/*
