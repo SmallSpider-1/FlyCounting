@@ -43,6 +43,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dataset-root", type=Path, default=DEFAULT_DATASET)
     parser.add_argument("--experiment-root", type=Path, default=DEFAULT_EXPERIMENT)
     parser.add_argument("--trackeval-root", type=Path, default=DEFAULT_TRACKEVAL)
+    parser.add_argument(
+        "--baseline-summary",
+        type=Path,
+        default=None,
+        help="Optional IoU-baseline summary.csv used to write a tracker-aligned delta table.",
+    )
     return parser.parse_args()
 
 
@@ -71,6 +77,11 @@ def write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
         writer.writeheader()
         writer.writerows(rows)
+
+
+def read_csv(path: Path) -> list[dict[str, str]]:
+    with path.open(encoding="utf-8", newline="") as stream:
+        return list(csv.DictReader(stream))
 
 
 def cache_to_mot(
@@ -164,10 +175,30 @@ def metric_row(tracker: str, sequence: str, metrics: dict[str, Any]) -> dict[str
     }
 
 
-def markdown_summary(rows: list[dict[str, Any]]) -> str:
+def experiment_description(association_metrics: dict[str, str]) -> tuple[str, str]:
+    values = set(association_metrics.values())
+    if values == {"normalized_euclidean"}:
+        return (
+            "fruitfly_mot_v1：8 个跟踪器归一化欧氏中心距离实验",
+            "8 个跟踪器的原生 ID 关联空间项统一替换为框中心欧氏距离/两框最小外接矩形对角线；"
+            "相似度接口使用 `1-distance`，原数值阈值及其余参数不变",
+        )
+    if values == {"iou"}:
+        return (
+            "fruitfly_mot_v1：8 个跟踪器工程 baseline",
+            "各跟踪器使用其登记的原生 IoU/IoU-like 关联空间项和官方默认检测型配置",
+        )
+    return (
+        "fruitfly_mot_v1：8 个跟踪器混合关联指标实验",
+        "各跟踪器关联指标见 evaluation_protocol.json",
+    )
+
+
+def markdown_summary(rows: list[dict[str, Any]], association_metrics: dict[str, str]) -> str:
+    title, association_condition = experiment_description(association_metrics)
     columns = ("rank", "tracker", "HOTA", "DetA", "AssA", "MOTA", "MOTP", "IDF1", "IDSW", "Frag", "FP", "FN")
     lines = [
-        "# fruitfly_mot_v1：8 个跟踪器工程 baseline",
+        f"# {title}",
         "",
         "> 全部 15 段（split=unassigned）仅作工程 baseline；不是独立测试集结论。百分比指标单位为 %。",
         "",
@@ -180,11 +211,75 @@ def markdown_summary(rows: list[dict[str, Any]]) -> str:
     lines.extend(
         [
             "",
-            "评测条件：RT-DETR-R18 EMA/FP32、640×640 直接拉伸、检测缓存下限 0.10；各跟踪器使用仓库中已登记的官方默认检测型配置；在线、AABB、类无关、无 ReID、无 GMC/ECC、无离线插值；TrackEval 匹配阈值 IoU=0.5。HOTA/DetA/AssA/LocA 为 0.05–0.95 阈值均值。",
+            f"评测条件：RT-DETR-R18 EMA/FP32、640×640 直接拉伸、检测缓存下限 0.10；{association_condition}；在线、AABB、类无关、无 ReID、无 GMC/ECC、无离线插值；TrackEval 匹配阈值仍为标准 IoU=0.5。HOTA/DetA/AssA/LocA 为 0.05–0.95 阈值均值。",
             "",
             "数据本身存在 3 个已确认的完全遮挡 GT 间断，因此原版 CLEAR 即使预测完全等于 GT 也报告 Frag=3；解读算法 Frag 时应同时保留这一本底。",
         ]
     )
+    return "\n".join(lines) + "\n"
+
+
+def load_association_metrics(track_root: Path) -> dict[str, str]:
+    metrics = {}
+    for tracker in TRACKERS:
+        path = track_root / tracker / "numeric_cache" / "resolved_tracker_config.json"
+        with path.open(encoding="utf-8") as stream:
+            config = json.load(stream)
+        metric = str(config.get("association_metric", "iou"))
+        if metric not in {"iou", "normalized_euclidean"}:
+            raise ValueError(f"Unknown association metric for {tracker}: {metric}")
+        metrics[tracker] = metric
+    return metrics
+
+
+def comparison_rows(current_rows: list[dict[str, Any]], baseline_summary: Path) -> list[dict[str, Any]]:
+    baseline_rows = read_csv(baseline_summary)
+    baseline_by_tracker = {row["tracker"]: row for row in baseline_rows}
+    if set(baseline_by_tracker) != set(TRACKERS):
+        raise ValueError(f"Baseline tracker set mismatch: {baseline_summary}")
+    output = []
+    for current in current_rows:
+        tracker = str(current["tracker"])
+        baseline = baseline_by_tracker[tracker]
+        row: dict[str, Any] = {"tracker": tracker}
+        for metric in ("HOTA", "IDF1", "MOTA", "IDSW", "Frag"):
+            baseline_value = float(baseline[metric])
+            current_value = float(current[metric])
+            if metric in {"IDSW", "Frag"}:
+                row[f"{metric}_iou"] = int(baseline_value)
+                row[f"{metric}_euclidean"] = int(current_value)
+                row[f"delta_{metric}"] = int(current_value - baseline_value)
+            else:
+                row[f"{metric}_iou"] = round(baseline_value, 6)
+                row[f"{metric}_euclidean"] = round(current_value, 6)
+                row[f"delta_{metric}"] = round(current_value - baseline_value, 6)
+        output.append(row)
+    return output
+
+
+def comparison_markdown(rows: list[dict[str, Any]]) -> str:
+    columns = (
+        "tracker",
+        "HOTA_iou",
+        "HOTA_euclidean",
+        "delta_HOTA",
+        "IDF1_iou",
+        "IDF1_euclidean",
+        "delta_IDF1",
+        "IDSW_iou",
+        "IDSW_euclidean",
+        "delta_IDSW",
+    )
+    lines = [
+        "# 归一化欧氏关联与 IoU baseline 对照",
+        "",
+        "> HOTA/IDF1 单位为百分点；IDSW 越低越好。仅为全 15 段工程对照，不是独立测试集结论。",
+        "",
+        "| " + " | ".join(columns) + " |",
+        "| " + " | ".join("---" for _ in columns) + " |",
+    ]
+    for row in rows:
+        lines.append("| " + " | ".join(str(row[column]) for column in columns) + " |")
     return "\n".join(lines) + "\n"
 
 
@@ -225,6 +320,7 @@ def main() -> int:
     input_root = experiment_root / "trackeval_input"
     output_root = experiment_root / "trackeval_output"
     metrics_root = experiment_root / "metrics"
+    association_metrics = load_association_metrics(track_root)
 
     conversion_rows: list[dict[str, Any]] = []
     for tracker in TRACKERS:
@@ -306,10 +402,21 @@ def main() -> int:
     write_csv(metrics_root / "cache_conversion_validation.csv", conversion_rows)
     speed_rows = tracking_speed_rows(track_root, sum(sequences.values()))
     write_csv(metrics_root / "tracking_speed.csv", speed_rows)
-    (metrics_root / "summary.md").write_text(markdown_summary(combined_rows), encoding="utf-8")
+    (metrics_root / "summary.md").write_text(
+        markdown_summary(combined_rows, association_metrics), encoding="utf-8"
+    )
     (metrics_root / "trackeval_full_results.json").write_text(
         json.dumps(serializable(results), ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
+    if args.baseline_summary is not None:
+        baseline_summary = args.baseline_summary.resolve()
+        if set(association_metrics.values()) != {"normalized_euclidean"}:
+            raise ValueError("--baseline-summary 仅用于全归一化欧氏关联与 IoU baseline 对照")
+        comparison = comparison_rows(combined_rows, baseline_summary)
+        write_csv(metrics_root / "comparison_vs_iou_baseline.csv", comparison)
+        (metrics_root / "comparison_vs_iou_baseline.md").write_text(
+            comparison_markdown(comparison), encoding="utf-8"
+        )
     protocol = {
         "status": "complete",
         "scope": "engineering_all_sequences_not_independent_test",
@@ -321,6 +428,17 @@ def main() -> int:
         "sequences": len(sequences),
         "frames": sum(sequences.values()),
         "trackers": list(TRACKERS),
+        "tracking_association": {
+            "metric_by_tracker": association_metrics,
+            "normalized_euclidean_definition": (
+                "bbox_center_euclidean_over_pairwise_enclosing_box_diagonal"
+            ),
+            "native_numeric_thresholds_unchanged": True,
+            "trackeval_evaluation_metric_unchanged": True,
+            "comparison_baseline_summary": (
+                str(args.baseline_summary.resolve()) if args.baseline_summary is not None else None
+            ),
+        },
         "evaluation": {
             "implementation": str(trackeval_root),
             "class_agnostic": True,
@@ -345,17 +463,19 @@ def main() -> int:
     (metrics_root / "evaluation_protocol.json").write_text(
         json.dumps(protocol, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
+    title, association_condition = experiment_description(association_metrics)
     (experiment_root / "README.md").write_text(
-        "# fruitfly_mot_v1：8 个跟踪器工程 baseline\n\n"
+        f"# {title}\n\n"
         "本目录保存统一 RT-DETR-R18 检测缓存、8 个算法的统一轨迹缓存、TrackEval 输入、合并/逐序列指标、"
         "解析后的跟踪器配置与速度汇总。\n\n"
+        f"轨迹关联条件：{association_condition}。\n\n"
         "权威总表为 `metrics/summary.csv`，便于阅读的表为 `metrics/summary.md`；冻结运行条件见 "
         "`metrics/evaluation_protocol.json` 与 `detections/detection_protocol.json`。\n\n"
         "当前 15 段均为 `split=unassigned`，所以这是全数据工程 baseline，不是独立测试集结论。TrackEval 文本中的"
         "轨迹 ID 按序列无损映射为从 1 开始的正整数；各算法原生 ID 保留在 `tracks/*/numeric_cache/`。\n",
         encoding="utf-8",
     )
-    print(markdown_summary(combined_rows))
+    print(markdown_summary(combined_rows, association_metrics))
     print(f"Results: {metrics_root}")
     return 0
 

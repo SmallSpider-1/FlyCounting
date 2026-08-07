@@ -30,6 +30,13 @@ Detection and output track coordinates are always full-frame `xyxy`. The first b
 
 `tracker_adapters.py` owns all native API differences. The counter never imports a tracker implementation. Class association is uniformly `current matched detection, otherwise last observation`; this is metadata propagation, not class voting. The absolute ID number is native to each tracker and is not compared across algorithms.
 
+For the Euclidean association experiment, pass
+`benchmark_common/configs/normalized_euclidean_association.json` to the unified runner. It replaces the
+native track-to-detection spatial association term with bbox-center Euclidean distance divided by the
+pairwise minimum-enclosing-rectangle diagonal; similarity-based tracker APIs receive `1 - distance`.
+Native numeric thresholds and all other tracker settings remain unchanged. TrackEval still uses standard
+IoU for evaluation, while metadata matching and non-association overlap mechanisms remain unchanged.
+
 ## Candidate parameters
 
 Each `configs/counting_candidate_v1.json` is the official-default starting point

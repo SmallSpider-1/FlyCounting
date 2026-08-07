@@ -8,6 +8,14 @@ from pathlib import Path
 
 import numpy as np
 
+from benchmark_common.association_metrics import (
+    IOU,
+    NORMALIZED_EUCLIDEAN,
+    SUPPORTED_ASSOCIATION_METRICS,
+    normalized_center_distance_from_sfsort,
+    normalized_center_distance_from_tracks,
+    normalized_center_similarity,
+)
 from tracking_model_benchmark._common.tracker_interface import FrameGeometry, UnifiedTrackerAdapter
 
 
@@ -145,9 +153,15 @@ def resolved_config(tracker_name: str, overrides: dict | None = None) -> dict:
     if tracker_name not in TRACKER_PROJECTS:
         raise ValueError(f"未知跟踪器: {tracker_name}")
     overrides = overrides or {}
-    unknown = set(overrides) - set(DEFAULT_CONFIGS[tracker_name])
+    unknown = set(overrides) - set(DEFAULT_CONFIGS[tracker_name]) - {"association_metric"}
     if unknown:
         raise ValueError(f"{tracker_name} 配置包含未知字段: {sorted(unknown)}")
+    metric = overrides.get("association_metric", IOU)
+    if metric not in SUPPORTED_ASSOCIATION_METRICS:
+        raise ValueError(
+            f"{tracker_name} association_metric={metric!r} 不受支持，"
+            f"可选值为 {list(SUPPORTED_ASSOCIATION_METRICS)}"
+        )
     return {**deepcopy(DEFAULT_CONFIGS[tracker_name]), **deepcopy(overrides)}
 
 
@@ -171,6 +185,36 @@ def enter_source(project: str, *extra_paths: Path) -> Path:
         if path_text not in sys.path:
             sys.path.insert(0, path_text)
     return source
+
+
+def set_module_metric(module, attribute: str, replacement, enabled: bool) -> None:
+    """Install or restore one process-local metric function without editing vendored sources."""
+    original_attribute = f"_benchmark_original_{attribute}"
+    if not hasattr(module, original_attribute):
+        setattr(module, original_attribute, getattr(module, attribute))
+    original = getattr(module, original_attribute)
+    setattr(module, attribute, replacement if enabled else original)
+
+
+def set_mapping_metric(module, mapping_attribute: str, key: str, replacement, enabled: bool) -> None:
+    """Install or restore one entry in a vendored association-function registry."""
+    mapping = getattr(module, mapping_attribute)
+    originals_attribute = f"_benchmark_original_{mapping_attribute}"
+    if not hasattr(module, originals_attribute):
+        setattr(module, originals_attribute, dict(mapping))
+    originals = getattr(module, originals_attribute)
+    if key not in originals:
+        raise ValueError(f"{module.__name__}.{mapping_attribute} has no key {key!r}")
+    mapping[key] = replacement if enabled else originals[key]
+
+
+def set_class_metric(cls, attribute: str, replacement, enabled: bool) -> None:
+    """Install or restore a static metric method on a vendored tracker class."""
+    original_attribute = f"_benchmark_original_{attribute}"
+    if not hasattr(cls, original_attribute):
+        setattr(cls, original_attribute, getattr(cls, attribute))
+    original = getattr(cls, original_attribute)
+    setattr(cls, attribute, staticmethod(replacement if enabled else original))
 
 
 def native_rows_from_objects(objects) -> np.ndarray:
@@ -210,14 +254,19 @@ class OfficialTrackerAdapter(UnifiedTrackerAdapter):
         self.implementation_commit = TRACKER_COMMITS[tracker_name]
         self.placeholder_image = None
         self.placeholder_tensor = None
+        self.association_metric = str(config.get("association_metric", IOU))
         super().__init__(geometry, config)
 
     def build_native_tracker(self):
-        config = self.config
+        config = {key: value for key, value in self.config.items() if key != "association_metric"}
+        use_euclidean = self.association_metric == NORMALIZED_EUCLIDEAN
         width, height = self.geometry.frame_size
         if self.tracker_name == "sort":
             enter_source(self.project)
-            from sort import KalmanBoxTracker, Sort
+            import sort as sort_module
+
+            set_module_metric(sort_module, "iou_batch", normalized_center_similarity, use_euclidean)
+            KalmanBoxTracker, Sort = sort_module.KalmanBoxTracker, sort_module.Sort
 
             KalmanBoxTracker.count = 0
             return Sort(
@@ -229,18 +278,44 @@ class OfficialTrackerAdapter(UnifiedTrackerAdapter):
             enter_source(self.project)
             from yolox.tracker.basetrack import BaseTrack
             from yolox.tracker.byte_tracker import BYTETracker
+            from yolox.tracker import matching
+
+            set_module_metric(
+                matching,
+                "iou_distance",
+                normalized_center_distance_from_tracks,
+                use_euclidean,
+            )
 
             BaseTrack._count = 0
             return BYTETracker(types.SimpleNamespace(**config), frame_rate=int(round(self.geometry.fps)))
         if self.tracker_name == "ocsort":
             enter_source(self.project)
-            from trackers.ocsort_tracker.ocsort import KalmanBoxTracker, OCSort
+            from trackers.ocsort_tracker import association as association_module
+            from trackers.ocsort_tracker import ocsort as ocsort_module
+
+            set_module_metric(association_module, "iou_batch", normalized_center_similarity, use_euclidean)
+            set_mapping_metric(
+                ocsort_module,
+                "ASSO_FUNCS",
+                str(config["asso_func"]),
+                normalized_center_similarity,
+                use_euclidean,
+            )
+            KalmanBoxTracker, OCSort = ocsort_module.KalmanBoxTracker, ocsort_module.OCSort
 
             KalmanBoxTracker.count = 0
             return OCSort(**config)
         if self.tracker_name == "sfsort":
             enter_source(self.project)
             from SFSORT import SFSORT
+
+            set_class_metric(
+                SFSORT,
+                "calculate_cost",
+                normalized_center_distance_from_sfsort,
+                use_euclidean,
+            )
 
             sfsort_config = dict(config)
             horizontal_ratio = float(sfsort_config.pop("horizontal_margin_ratio"))
@@ -269,13 +344,24 @@ class OfficialTrackerAdapter(UnifiedTrackerAdapter):
             if root_text not in sys.path:
                 sys.path.insert(0, root_text)
             from ultralytics.trackers import FASTTracker
+            from ultralytics.trackers.utils import matching
+
+            set_module_metric(
+                matching,
+                "iou_distance",
+                normalized_center_distance_from_tracks,
+                use_euclidean,
+            )
 
             return FASTTracker(args=types.SimpleNamespace(**config))
         if self.tracker_name == "boosttrack":
             enter_source(self.project, BENCHMARK_ROOT / self.project / "src" / "external")
             import torch
             from default_settings import BoostTrackPlusPlusSettings, BoostTrackSettings, GeneralSettings
+            from tracker import assoc as association_module
             from tracker.boost_track import BoostTrack, KalmanBoxTracker
+
+            set_module_metric(association_module, "iou_batch", normalized_center_similarity, use_euclidean)
 
             GeneralSettings.values.update(
                 max_age=int(config["max_age"]),
@@ -306,7 +392,16 @@ class OfficialTrackerAdapter(UnifiedTrackerAdapter):
             return BoostTrack(None)
         if self.tracker_name == "hybridsort":
             enter_source(self.project)
-            from trackers.hybrid_sort_tracker.hybrid_sort import Hybrid_Sort, KalmanBoxTracker
+            from trackers.hybrid_sort_tracker import hybrid_sort as hybrid_module
+
+            set_mapping_metric(
+                hybrid_module,
+                "ASSO_FUNCS",
+                str(config["asso_func"]),
+                normalized_center_similarity,
+                use_euclidean,
+            )
+            Hybrid_Sort, KalmanBoxTracker = hybrid_module.Hybrid_Sort, hybrid_module.KalmanBoxTracker
 
             KalmanBoxTracker.count = 0
             argument_names = {
@@ -326,6 +421,14 @@ class OfficialTrackerAdapter(UnifiedTrackerAdapter):
             torch_six.string_classes = (str,)
             sys.modules.setdefault("torch._six", torch_six)
             from tracker.bot_sort import BoTSORT
+            from tracker import matching
+
+            set_module_metric(
+                matching,
+                "iou_distance",
+                normalized_center_distance_from_tracks,
+                use_euclidean,
+            )
 
             args = dict(config)
             args.update(
@@ -340,6 +443,22 @@ class OfficialTrackerAdapter(UnifiedTrackerAdapter):
             self.placeholder_image = np.zeros((height, width, 3), dtype=np.uint8)
             return BoTSORT(types.SimpleNamespace(**args), frame_rate=int(round(self.geometry.fps)))
         raise AssertionError(self.tracker_name)
+
+    def cache_metadata(self) -> dict:
+        metadata = super().cache_metadata()
+        metadata.update(
+            {
+                "association_metric": self.association_metric,
+                "association_metric_definition": (
+                    "bbox_center_euclidean_over_pairwise_enclosing_box_diagonal"
+                    if self.association_metric == NORMALIZED_EUCLIDEAN
+                    else "native_iou_or_iou_like_spatial_term"
+                ),
+                "association_threshold_policy": "native_numeric_values_unchanged",
+                "association_patch_scope": "native_track_to_detection_identity_association_spatial_term",
+            }
+        )
+        return metadata
 
     def update_native(self, detections: np.ndarray, frame_index: int) -> np.ndarray:
         input_nx5 = detections[:, :5].copy()
